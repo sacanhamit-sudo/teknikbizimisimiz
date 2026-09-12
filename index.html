@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="dc-runtime.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics=""><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""><style>
+body{margin:0;background:#E8E5DD;font-family:Archivo,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#17624A}a:hover{color:#0E4632}
+*{box-sizing:border-box}
+::-webkit-scrollbar{width:0;height:0}
+@keyframes scanline{0%{transform:translateY(0)}100%{transform:translateY(168px)}}
+@keyframes popin{0%{transform:scale(.9);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes slideup{0%{transform:translateY(14px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes pulsedot{0%,100%{opacity:1}50%{opacity:.35}}
+</style></helmet>
+
+<div style="min-height:100vh;padding:32px 24px 56px;display:flex;flex-direction:column;align-items:center;gap:22px;background:radial-gradient(120% 80% at 50% 0%,#F2F0EA 0%,#E2DED4 100%)">
+
+  <div style="width:100%;max-width:720px;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px">
+      <h1 style="margin:0;font-size:19px;font-weight:700;letter-spacing:-0.3px;color:#14181A">Teknik Satınalma Talebi</h1>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#7A7C74">Mobil · Gıda Üretimi Bakım · v0.1</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <button sc-camel-on-click="{{ goHome }}" style="border:1px solid rgba(20,24,26,.14);background:#FFF;color:#14181A;font-family:Archivo,sans-serif;font-size:12.5px;font-weight:600;padding:8px 13px;border-radius:999px;cursor:pointer" style-hover="border-color:#17624A;color:#17624A">1 · Talepler</button>
+      <button sc-camel-on-click="{{ goNew }}" style="border:1px solid rgba(20,24,26,.14);background:#FFF;color:#14181A;font-family:Archivo,sans-serif;font-size:12.5px;font-weight:600;padding:8px 13px;border-radius:999px;cursor:pointer" style-hover="border-color:#17624A;color:#17624A">2 · Yeni talep</button>
+      <button sc-camel-on-click="{{ goDetail }}" style="border:1px solid rgba(20,24,26,.14);background:#FFF;color:#14181A;font-family:Archivo,sans-serif;font-size:12.5px;font-weight:600;padding:8px 13px;border-radius:999px;cursor:pointer" style-hover="border-color:#17624A;color:#17624A">3 · Durum takibi</button>
+      <button sc-camel-on-click="{{ goApprove }}" style="border:1px solid rgba(20,24,26,.14);background:#FFF;color:#14181A;font-family:Archivo,sans-serif;font-size:12.5px;font-weight:600;padding:8px 13px;border-radius:999px;cursor:pointer" style-hover="border-color:#17624A;color:#17624A">4 · Onay kuyruğu</button>
+      <button sc-camel-on-click="{{ goBuyer }}" style="border:1px solid rgba(20,24,26,.14);background:#FFF;color:#14181A;font-family:Archivo,sans-serif;font-size:12.5px;font-weight:600;padding:8px 13px;border-radius:999px;cursor:pointer" style-hover="border-color:#2E5FA3;color:#2E5FA3">5 · Satınalma masası</button>
+      <button sc-camel-on-click="{{ goBuyerWork }}" style="border:1px solid rgba(20,24,26,.14);background:#FFF;color:#14181A;font-family:Archivo,sans-serif;font-size:12.5px;font-weight:600;padding:8px 13px;border-radius:999px;cursor:pointer" style-hover="border-color:#2E5FA3;color:#2E5FA3">6 · Süreç işleme</button>
+      <button sc-camel-on-click="{{ goScan }}" style="border:1px solid rgba(20,24,26,.14);background:#14181A;color:#FFF;font-family:Archivo,sans-serif;font-size:12.5px;font-weight:600;padding:8px 13px;border-radius:999px;cursor:pointer">Barkod okut</button>
+    </div>
+    <p style="margin:0;font-size:12.5px;line-height:1.6;color:#5E6159;max-width:60ch;text-wrap:pretty">Tümü tıklanabilir: talebi aç, adımları doldur, barkod okut, onayla. Teknisyen ve vardiya şefi görünümleri alt sekmelerden geçiş yapar.</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:30px;justify-content:center;align-items:flex-start">
+  <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+  <div style="display:flex;align-items:center;gap:8px;padding-left:4px">
+    <span style="width:7px;height:7px;border-radius:99px;background:#17624A"></span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#5E6159">Teknisyen / Vardiya şefi</span>
+  </div>
+  <x-import component-from-global-scope="IOSDevice" from="ios-frame.jsx" hint-size="402px,874px">
+    <div style="height:100%;display:flex;flex-direction:column;background:#F5F3EE;font-family:Archivo,system-ui,sans-serif;position:relative;overflow:hidden">
+
+      <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+        <div style="flex:none;background:#14201C;padding:60px 20px 22px;color:#fff;position:relative">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <span style="font-size:12px;font-weight:500;color:rgba(255,255,255,.62);letter-spacing:.02em">İyi vardiya,</span>
+              <span style="font-size:22px;font-weight:700;letter-spacing:-0.4px">Okan Yalçın</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#7FC6A4">Bakım Teknisyeni · Vardiya B</span>
+            </div>
+            <button sc-camel-on-click="{{ goNotif }}" style="width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;flex:none">
+              <span style="font-size:17px;color:#fff">◔</span>
+              <span style="position:absolute;top:9px;right:9px;width:8px;height:8px;border-radius:99px;background:#E0A22B;border:2px solid #14201C"></span>
+            </button>
+          </div>
+          <sc-if value="{{ showStats }}" hint-placeholder-val="{{ true }}">
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin-top:20px;background:rgba(255,255,255,.12);border-radius:14px;overflow:hidden">
+            <div style="background:#1B2B25;padding:12px 12px 13px;display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:24px;font-weight:700;line-height:1;color:#E0A22B;font-family:'IBM Plex Mono',monospace">3</span>
+              <span style="font-size:10.5px;font-weight:500;color:rgba(255,255,255,.66);line-height:1.3">Onay<br>bekliyor</span>
+            </div>
+            <div style="background:#1B2B25;padding:12px 12px 13px;display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:24px;font-weight:700;line-height:1;color:#7FC6A4;font-family:'IBM Plex Mono',monospace">5</span>
+              <span style="font-size:10.5px;font-weight:500;color:rgba(255,255,255,.66);line-height:1.3">Tedarik<br>sürecinde</span>
+            </div>
+            <div style="background:#1B2B25;padding:12px 12px 13px;display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:24px;font-weight:700;line-height:1;color:#fff;font-family:'IBM Plex Mono',monospace">12</span>
+              <span style="font-size:10.5px;font-weight:500;color:rgba(255,255,255,.66);line-height:1.3">Bu ay<br>teslim</span>
+            </div>
+          </div>
+          </sc-if>
+          <div style="display:flex;gap:9px;margin-top:16px">
+            <button sc-camel-on-click="{{ goNew }}" style="flex:1;height:50px;border-radius:14px;border:none;background:#17624A;color:#fff;font-family:Archivo,sans-serif;font-size:15px;font-weight:600;letter-spacing:-0.2px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px" style-active="background:#0E4632">＋ Yeni Talep</button>
+            <button sc-camel-on-click="{{ goScan }}" style="width:50px;height:50px;border-radius:14px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:19px;cursor:pointer;flex:none" style-active="background:rgba(255,255,255,.16)">▤</button>
+          </div>
+        </div>
+
+        <div style="flex:none;display:flex;gap:7px;padding:14px 20px 12px;overflow-x:auto;overflow-y:hidden;align-items:center">
+          <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+            <button sc-camel-on-click="{{ f.onPick }}" style="flex:0 0 auto;white-space:nowrap;border-radius:999px;font-family:Archivo,sans-serif;font-size:12.5px;font-weight:600;padding:8px 14px;cursor:pointer;border:1px solid {{ f.border }};background:{{ f.bg }};color:{{ f.fg }}">{{ f.label }}</button>
+          </sc-for>
+        </div>
+
+        <div style="flex:none;padding:2px 16px 18px;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ visibleRequests }}" as="r" hint-placeholder-count="4">
+            <button sc-camel-on-click="{{ r.onOpen }}" style="text-align:left;width:100%;border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:16px;padding:0;overflow:hidden;cursor:pointer;display:flex;box-shadow:0 1px 2px rgba(20,24,26,.05);font-family:Archivo,sans-serif" style-hover="border-color:rgba(20,24,26,.2)">
+              <div style="width:4px;flex:none;background:{{ r.urgColor }}"></div>
+              <div style="flex:1;min-width:0;padding:13px 14px 13px 13px;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:500;letter-spacing:.05em;color:#8A8D84">{{ r.code }}</span>
+                  <span style="font-size:10px;font-weight:600;letter-spacing:.03em;padding:4px 8px;border-radius:999px;background:{{ r.statusBg }};color:{{ r.statusFg }}">{{ r.status }}</span>
+                </div>
+                <span style="font-size:15px;font-weight:600;line-height:1.3;letter-spacing:-0.2px;color:#14181A;text-wrap:pretty">{{ r.title }}</span>
+                <sc-if value="{{ verbose }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#5E6159;background:#F1EFE8;padding:3px 7px;border-radius:5px">{{ r.sku }}</span>
+                  <span style="font-size:11.5px;font-weight:500;color:#5E6159">{{ r.qty }}</span>
+                  <span style="width:3px;height:3px;border-radius:99px;background:#C6C8BF"></span>
+                  <span style="font-size:11.5px;font-weight:500;color:#5E6159">{{ r.line }}</span>
+                </div>
+                </sc-if>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:2px;border-top:1px solid rgba(20,24,26,.07)">
+                  <span style="font-size:11.5px;font-weight:500;color:{{ r.dateColor }};padding-top:8px">İhtiyaç: {{ r.need }}</span>
+                  <span style="font-size:11px;font-weight:600;color:{{ r.urgColor }};padding-top:8px">{{ r.urgency }}</span>
+                </div>
+              </div>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isNew }}">
+      <div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+        <div style="background:#F5F3EE;padding:58px 18px 12px;position:sticky;top:0;z-index:5;border-bottom:1px solid rgba(20,24,26,.08)">
+          <div style="display:flex;align-items:center;gap:10px">
+            <button sc-camel-on-click="{{ back }}" style="width:36px;height:36px;flex:none;border-radius:11px;border:1px solid rgba(20,24,26,.12);background:#fff;font-size:15px;color:#14181A;cursor:pointer">←</button>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+              <span style="font-size:16px;font-weight:700;letter-spacing:-0.3px;color:#14181A">Yeni Talep</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8A8D84">Adım {{ stepNo }}/3 · {{ stepName }}</span>
+            </div>
+            <span style="font-size:11.5px;font-weight:600;color:#8A8D84">Taslak</span>
+          </div>
+          <div style="display:flex;gap:5px;margin-top:12px">
+            <div style="flex:1;height:4px;border-radius:9px;background:{{ bar1 }}"></div>
+            <div style="flex:1;height:4px;border-radius:9px;background:{{ bar2 }}"></div>
+            <div style="flex:1;height:4px;border-radius:9px;background:{{ bar3 }}"></div>
+          </div>
+        </div>
+
+        <sc-if value="{{ step1 }}">
+        <div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;gap:9px">
+            <div style="flex:1;height:46px;border-radius:13px;border:1px solid rgba(20,24,26,.13);background:#fff;display:flex;align-items:center;gap:9px;padding:0 13px">
+              <span style="color:#8A8D84;font-size:14px">⌕</span>
+              <input value="{{ query }}" sc-camel-on-change="{{ onQuery }}" placeholder="Malzeme adı veya stok kodu" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:Archivo,sans-serif;font-size:14px;color:#14181A">
+            </div>
+            <button sc-camel-on-click="{{ goScan }}" style="width:46px;height:46px;flex:none;border-radius:13px;border:none;background:#14181A;color:#fff;font-size:18px;cursor:pointer">▤</button>
+          </div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84">Katalog · {{ resultCount }} sonuç</span>
+            <span style="font-size:11.5px;font-weight:600;color:#17624A">Stok durumu canlı</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ catalog }}" as="c" hint-placeholder-count="4">
+              <button sc-camel-on-click="{{ c.onPick }}" style="text-align:left;border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:14px;padding:12px 13px;cursor:pointer;display:flex;align-items:center;gap:12px;font-family:Archivo,sans-serif" style-hover="border-color:#17624A">
+                <div style="width:38px;height:38px;flex:none;border-radius:10px;background:#EEEBE2;border:1px solid rgba(20,24,26,.07);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#8A8D84">FOTO</div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                  <span style="font-size:13.5px;font-weight:600;color:#14181A;line-height:1.3">{{ c.name }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8A8D84">{{ c.sku }}</span>
+                </div>
+                <span style="flex:none;font-size:10.5px;font-weight:600;padding:4px 8px;border-radius:999px;background:{{ c.stockBg }};color:{{ c.stockFg }}">{{ c.stock }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <button sc-camel-on-click="{{ pickCustom }}" style="border:1px dashed rgba(20,24,26,.22);background:transparent;border-radius:14px;padding:13px;cursor:pointer;font-family:Archivo,sans-serif;font-size:13px;font-weight:600;color:#5E6159">Katalogda yok — serbest metin gir</button>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ step2 }}">
+        <div style="padding:16px 18px 22px;display:flex;flex-direction:column;gap:16px">
+          <div style="border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:14px;padding:13px;display:flex;align-items:center;gap:12px">
+            <div style="width:40px;height:40px;flex:none;border-radius:10px;background:#EEEBE2;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#8A8D84">FOTO</div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+              <span style="font-size:14px;font-weight:600;color:#14181A;line-height:1.3">{{ pickedName }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8A8D84">{{ pickedSku }}</span>
+            </div>
+            <button sc-camel-on-click="{{ toStep1 }}" style="border:none;background:transparent;font-family:Archivo,sans-serif;font-size:12px;font-weight:600;color:#17624A;cursor:pointer;flex:none">Değiştir</button>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84">Miktar · zorunlu</span>
+            <div style="display:flex;gap:9px;align-items:center">
+              <div style="flex:1;height:52px;border-radius:13px;border:1px solid rgba(20,24,26,.13);background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 6px">
+                <button sc-camel-on-click="{{ dec }}" style="width:40px;height:40px;border-radius:10px;border:none;background:#F1EFE8;font-size:19px;color:#14181A;cursor:pointer">−</button>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;color:#14181A">{{ qty }}</span>
+                <button sc-camel-on-click="{{ inc }}" style="width:40px;height:40px;border-radius:10px;border:none;background:#F1EFE8;font-size:19px;color:#14181A;cursor:pointer">＋</button>
+              </div>
+              <div style="display:flex;gap:5px;flex:none">
+                <sc-for list="{{ units }}" as="u" hint-placeholder-count="3">
+                  <button sc-camel-on-click="{{ u.onPick }}" style="height:52px;min-width:46px;border-radius:13px;cursor:pointer;font-family:Archivo,sans-serif;font-size:12.5px;font-weight:600;border:1px solid {{ u.border }};background:{{ u.bg }};color:{{ u.fg }}">{{ u.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84">İhtiyaç tarihi · zorunlu</span>
+            <div style="display:flex;gap:7px">
+              <sc-for list="{{ dates }}" as="d" hint-placeholder-count="3">
+                <button sc-camel-on-click="{{ d.onPick }}" style="flex:1;padding:11px 6px;border-radius:12px;cursor:pointer;font-family:Archivo,sans-serif;display:flex;flex-direction:column;gap:2px;align-items:center;border:1px solid {{ d.border }};background:{{ d.bg }}">
+                  <span style="font-size:12.5px;font-weight:600;color:{{ d.fg }}">{{ d.label }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:{{ d.sub }}">{{ d.date }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84">Aciliyet</span>
+            <div style="display:flex;gap:5px;background:#EDEBE3;padding:4px;border-radius:13px">
+              <sc-for list="{{ urgencies }}" as="u" hint-placeholder-count="3">
+                <button sc-camel-on-click="{{ u.onPick }}" style="flex:1;padding:10px 4px;border-radius:10px;border:none;cursor:pointer;font-family:Archivo,sans-serif;font-size:12.5px;font-weight:600;background:{{ u.bg }};color:{{ u.fg }};box-shadow:{{ u.shadow }}">{{ u.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84">Ekipman &amp; not</span>
+              <span style="font-size:11px;font-weight:500;color:#A8ABA1">opsiyonel</span>
+            </div>
+            <div style="display:flex;gap:7px;flex-wrap:wrap">
+              <sc-for list="{{ machines }}" as="m" hint-placeholder-count="4">
+                <button sc-camel-on-click="{{ m.onPick }}" style="border-radius:999px;padding:8px 12px;cursor:pointer;font-family:Archivo,sans-serif;font-size:12px;font-weight:600;border:1px solid {{ m.border }};background:{{ m.bg }};color:{{ m.fg }}">{{ m.label }}</button>
+              </sc-for>
+            </div>
+            <textarea value="{{ note }}" sc-camel-on-change="{{ onNote }}" placeholder="Arıza / kullanım notu…" style="border:1px solid rgba(20,24,26,.13);background:#fff;border-radius:13px;padding:12px;min-height:74px;resize:none;outline:none;font-family:Archivo,sans-serif;font-size:13.5px;line-height:1.5;color:#14181A"></textarea>
+            <div style="display:flex;gap:8px">
+              <div style="width:66px;height:66px;border-radius:12px;background:#E4E0D6;border:1px solid rgba(20,24,26,.08);display:flex;align-items:flex-end;padding:6px;font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:#7A7C74">RULMAN</div>
+              <div style="width:66px;height:66px;border-radius:12px;background:#E4E0D6;border:1px solid rgba(20,24,26,.08);display:flex;align-items:flex-end;padding:6px;font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:#7A7C74">ETİKET</div>
+              <button style="width:66px;height:66px;border-radius:12px;border:1px dashed rgba(20,24,26,.24);background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-family:Archivo,sans-serif">
+                <span style="font-size:16px;color:#5E6159">＋</span>
+                <span style="font-size:9.5px;font-weight:600;color:#5E6159">Foto</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ step3 }}">
+        <div style="padding:16px 18px 22px;display:flex;flex-direction:column;gap:14px">
+          <div style="border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:16px;overflow:hidden">
+            <div style="padding:14px;border-bottom:1px solid rgba(20,24,26,.07);display:flex;flex-direction:column;gap:4px">
+              <span style="font-size:16px;font-weight:600;color:#14181A;line-height:1.3">{{ pickedName }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8A8D84">{{ pickedSku }}</span>
+            </div>
+            <sc-for list="{{ summary }}" as="s" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(20,24,26,.05)">
+                <span style="font-size:12.5px;font-weight:500;color:#7A7C74">{{ s.k }}</span>
+                <span style="font-size:13px;font-weight:600;color:#14181A;text-align:right">{{ s.v }}</span>
+              </div>
+            </sc-for>
+            <div style="padding:12px 14px;background:#F7F5F0;display:flex;align-items:center;gap:9px">
+              <span style="width:26px;height:26px;flex:none;border-radius:99px;background:#E0A22B;color:#14181A;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">SD</span>
+              <span style="font-size:12px;font-weight:500;color:#5E6159;line-height:1.4">Onaya gidecek: <b style="color:#14181A">Serkan Demir</b> · Vardiya Şefi</span>
+            </div>
+          </div>
+          <div style="border-radius:14px;background:#FBF3E2;border:1px solid #EBD9B4;padding:12px 13px;display:flex;gap:10px">
+            <span style="font-size:14px;color:#B4801C">⚠</span>
+            <span style="font-size:12px;font-weight:500;line-height:1.5;color:#6B5423;text-wrap:pretty">Gıda temaslı bölgede kullanılacak malzemeler için NSF H1 / EC 1935-2004 belgesi satınalma tarafından talep edilir.</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <div style="margin-top:auto;padding:12px 18px 26px;background:#F5F3EE;border-top:1px solid rgba(20,24,26,.08);display:flex;gap:9px">
+          <button sc-camel-on-click="{{ back }}" style="width:52px;height:50px;flex:none;border-radius:14px;border:1px solid rgba(20,24,26,.13);background:#fff;font-size:15px;color:#14181A;cursor:pointer">←</button>
+          <button sc-camel-on-click="{{ next }}" style="flex:1;height:50px;border-radius:14px;border:none;background:{{ nextBg }};color:#fff;font-family:Archivo,sans-serif;font-size:15px;font-weight:600;cursor:pointer" style-active="opacity:.88">{{ nextLabel }}</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isDetail }}">
+      <div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+        <div style="background:#14201C;color:#fff;padding:58px 20px 20px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+            <button sc-camel-on-click="{{ goHome }}" style="width:36px;height:36px;flex:none;border-radius:11px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);font-size:15px;color:#fff;cursor:pointer">←</button>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;color:rgba(255,255,255,.72)">TLP-2416</span>
+            <span style="margin-left:auto;font-size:10px;font-weight:600;letter-spacing:.03em;padding:5px 9px;border-radius:999px;background:rgba(224,162,43,.18);color:#F0C168">TEKLİF TOPLANIYOR</span>
+          </div>
+          <span style="display:block;font-size:20px;font-weight:700;line-height:1.3;letter-spacing:-0.3px;text-wrap:pretty">Dolum hattı taşıyıcı bant rulmanı</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#fff;background:rgba(255,255,255,.12);padding:5px 9px;border-radius:7px">RLM-6204-2Z</span>
+            <span style="font-size:11.5px;font-weight:600;color:#fff;background:rgba(255,255,255,.12);padding:5px 9px;border-radius:7px">4 adet</span>
+            <span style="font-size:11.5px;font-weight:600;color:#14181A;background:#E86B57;padding:5px 9px;border-radius:7px">Kritik</span>
+          </div>
+        </div>
+
+        <div style="padding:18px 20px 8px;display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84;margin-bottom:12px">Süreç</span>
+          <sc-for list="{{ timeline }}" as="t" hint-placeholder-count="6">
+            <div style="display:flex;gap:13px">
+              <div style="width:20px;flex:none;display:flex;flex-direction:column;align-items:center">
+                <div style="width:14px;height:14px;border-radius:99px;border:2px solid {{ t.ring }};background:{{ t.dot }};margin-top:3px;animation:{{ t.anim }}"></div>
+                <div style="flex:1;width:2px;background:{{ t.rail }};min-height:16px"></div>
+              </div>
+              <div style="flex:1;min-width:0;padding-bottom:16px;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:13.5px;font-weight:600;color:{{ t.titleColor }};line-height:1.3">{{ t.title }}</span>
+                <span style="font-size:11.5px;font-weight:500;color:#8A8D84;line-height:1.4">{{ t.meta }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="padding:4px 16px 18px;display:flex;flex-direction:column;gap:10px">
+          <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84;padding:0 4px">Gelen teklifler</span>
+          <sc-for list="{{ quotes }}" as="q" hint-placeholder-count="3">
+            <div style="border:1px solid {{ q.border }};background:#fff;border-radius:14px;padding:12px 13px;display:flex;align-items:center;gap:12px">
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:13.5px;font-weight:600;color:#14181A">{{ q.name }}</span>
+                <span style="font-size:11.5px;font-weight:500;color:#8A8D84">{{ q.meta }}</span>
+              </div>
+              <div style="flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;color:{{ q.priceColor }}">{{ q.price }}</span>
+                <span style="font-size:10.5px;font-weight:600;color:{{ q.tagColor }}">{{ q.tag }}</span>
+              </div>
+            </div>
+          </sc-for>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button style="flex:1;height:48px;border-radius:14px;border:1px solid rgba(20,24,26,.13);background:#fff;font-family:Archivo,sans-serif;font-size:13.5px;font-weight:600;color:#14181A;cursor:pointer">Satınalmayı dürt</button>
+            <button style="flex:1;height:48px;border-radius:14px;border:1px solid rgba(232,107,87,.4);background:#FDF1EF;font-family:Archivo,sans-serif;font-size:13.5px;font-weight:600;color:#B3392C;cursor:pointer">Talebi iptal et</button>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isApprove }}">
+      <div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+        <div style="background:#14201C;color:#fff;padding:58px 20px 18px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <span style="font-size:20px;font-weight:700;letter-spacing:-0.3px">Onay Kuyruğu</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#7FC6A4">Serkan Demir · Vardiya Şefi</span>
+            </div>
+            <span style="flex:none;font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;color:#E0A22B">{{ pendingCount }}</span>
+          </div>
+          <div style="margin-top:16px;padding:12px 13px;border-radius:13px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <span style="font-size:11.5px;font-weight:500;color:rgba(255,255,255,.7)">Eylül bakım bütçesi</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;color:#fff">₺186.400 / ₺250.000</span>
+            </div>
+            <div style="height:6px;border-radius:9px;background:rgba(255,255,255,.14);overflow:hidden">
+              <div style="width:74%;height:100%;background:#7FC6A4"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:16px 16px 20px;display:flex;flex-direction:column;gap:11px">
+          <sc-if value="{{ hasPending }}" hint-placeholder-val="{{ true }}">
+          <sc-for list="{{ pending }}" as="p" hint-placeholder-count="2">
+            <div style="border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(20,24,26,.05);animation:slideup .28s ease both">
+              <div style="padding:13px 14px;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.05em;color:#8A8D84">{{ p.code }}</span>
+                  <span style="font-size:10px;font-weight:600;padding:4px 8px;border-radius:999px;background:{{ p.urgBg }};color:{{ p.urgFg }}">{{ p.urgency }}</span>
+                </div>
+                <span style="font-size:15px;font-weight:600;line-height:1.3;color:#14181A;text-wrap:pretty">{{ p.title }}</span>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <span style="font-size:11.5px;font-weight:500;color:#5E6159;background:#F1EFE8;padding:4px 8px;border-radius:6px">{{ p.qty }}</span>
+                  <span style="font-size:11.5px;font-weight:500;color:#5E6159;background:#F1EFE8;padding:4px 8px;border-radius:6px">{{ p.line }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;color:#5E6159;background:#F1EFE8;padding:4px 8px;border-radius:6px">{{ p.est }}</span>
+                </div>
+                <span style="font-size:11.5px;font-weight:500;color:#8A8D84;line-height:1.45">{{ p.by }}</span>
+              </div>
+              <div style="display:flex;gap:1px;background:rgba(20,24,26,.08)">
+                <button sc-camel-on-click="{{ p.onReject }}" style="flex:1;height:46px;border:none;background:#fff;font-family:Archivo,sans-serif;font-size:13.5px;font-weight:600;color:#B3392C;cursor:pointer" style-hover="background:#FDF1EF">Reddet</button>
+                <button sc-camel-on-click="{{ p.onApprove }}" style="flex:1.6;height:46px;border:none;background:#17624A;font-family:Archivo,sans-serif;font-size:13.5px;font-weight:600;color:#fff;cursor:pointer" style-hover="background:#0E4632">Onayla ve satınalmaya gönder</button>
+              </div>
+            </div>
+          </sc-for>
+          </sc-if>
+          <sc-if value="{{ allDone }}">
+          <div style="padding:40px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;animation:popin .3s ease both">
+            <span style="width:56px;height:56px;border-radius:99px;background:#E4F0E9;color:#17624A;font-size:24px;display:flex;align-items:center;justify-content:center">✓</span>
+            <span style="font-size:15.5px;font-weight:600;color:#14181A">Kuyruk temiz</span>
+            <span style="font-size:12.5px;font-weight:500;color:#8A8D84;line-height:1.5;max-width:26ch">Vardiya devrinde bekleyen onay kalmadı. Kararlar satınalmaya iletildi.</span>
+            <button sc-camel-on-click="{{ resetQueue }}" style="margin-top:6px;border:1px solid rgba(20,24,26,.13);background:#fff;border-radius:999px;padding:9px 16px;font-family:Archivo,sans-serif;font-size:12.5px;font-weight:600;color:#14181A;cursor:pointer">Kuyruğu geri yükle</button>
+          </div>
+          </sc-if>
+          <div style="margin-top:4px;padding:13px;border-radius:14px;border:1px dashed rgba(20,24,26,.18);display:flex;flex-direction:column;gap:4px">
+            <span style="font-size:12px;font-weight:600;color:#14181A">Otomatik onay kuralı</span>
+            <span style="font-size:11.5px;font-weight:500;color:#8A8D84;line-height:1.45">₺1.500 altındaki sarf talepleri, stokta varsa onaysız geçer.</span>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isNotif }}">
+      <div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+        <div style="padding:58px 20px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(20,24,26,.08)">
+          <button sc-camel-on-click="{{ goHome }}" style="width:36px;height:36px;flex:none;border-radius:11px;border:1px solid rgba(20,24,26,.12);background:#fff;font-size:15px;color:#14181A;cursor:pointer">←</button>
+          <span style="font-size:17px;font-weight:700;letter-spacing:-0.3px;color:#14181A">Bildirimler</span>
+        </div>
+        <div style="padding:8px 0">
+          <sc-for list="{{ notifs }}" as="n" hint-placeholder-count="4">
+            <div style="display:flex;gap:12px;padding:14px 20px;border-bottom:1px solid rgba(20,24,26,.06);background:{{ n.bg }}">
+              <span style="width:34px;height:34px;flex:none;border-radius:10px;background:{{ n.iconBg }};color:{{ n.iconFg }};display:flex;align-items:center;justify-content:center;font-size:14px">{{ n.icon }}</span>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:13.5px;font-weight:600;color:#14181A;line-height:1.35;text-wrap:pretty">{{ n.title }}</span>
+                <span style="font-size:11.5px;font-weight:500;color:#8A8D84">{{ n.meta }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isBuyer }}">
+      <div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+        <div style="flex:none;background:#1A2430;color:#fff;padding:58px 20px 18px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <span style="font-size:20px;font-weight:700;letter-spacing:-0.3px">Satınalma Masası</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#8FB6D8">Ayşe Tuna · Satınalma Uzmanı</span>
+            </div>
+            <button sc-camel-on-click="{{ goHome }}" style="flex:none;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);border-radius:999px;padding:8px 12px;font-family:Archivo,sans-serif;font-size:11.5px;font-weight:600;color:#fff;cursor:pointer">Rol değiştir</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin-top:18px;background:rgba(255,255,255,.12);border-radius:14px;overflow:hidden">
+            <div style="background:#22303E;padding:12px;display:flex;flex-direction:column;gap:2px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;line-height:1;color:#E0A22B">4</span>
+              <span style="font-size:10.5px;font-weight:500;color:rgba(255,255,255,.66);line-height:1.3">Yeni<br>düşen</span>
+            </div>
+            <div style="background:#22303E;padding:12px;display:flex;flex-direction:column;gap:2px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;line-height:1;color:#8FB6D8">8</span>
+              <span style="font-size:10.5px;font-weight:500;color:rgba(255,255,255,.66);line-height:1.3">Teklif<br>aşamasında</span>
+            </div>
+            <div style="background:#22303E;padding:12px;display:flex;flex-direction:column;gap:2px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;line-height:1;color:#E86B57">2</span>
+              <span style="font-size:10.5px;font-weight:500;color:rgba(255,255,255,.66);line-height:1.3">SLA<br>aşımı</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:none;display:flex;gap:6px;padding:14px 16px 12px;overflow-x:auto;overflow-y:hidden;align-items:center">
+          <sc-for list="{{ buyerFilters }}" as="f" hint-placeholder-count="4">
+            <button sc-camel-on-click="{{ f.onPick }}" style="flex:0 0 auto;white-space:nowrap;border-radius:999px;font-family:Archivo,sans-serif;font-size:12.5px;font-weight:600;padding:8px 13px;cursor:pointer;border:1px solid {{ f.border }};background:{{ f.bg }};color:{{ f.fg }}">{{ f.label }}</button>
+          </sc-for>
+        </div>
+
+        <div style="flex:none;padding:0 16px 20px;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ buyerQueue }}" as="b" hint-placeholder-count="3">
+            <div style="border:1px solid {{ b.border }};background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(20,24,26,.05)">
+              <div style="padding:13px 14px 12px;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.05em;color:#8A8D84">{{ b.code }}</span>
+                  <span style="font-size:10px;font-weight:600;padding:4px 8px;border-radius:999px;background:{{ b.slaBg }};color:{{ b.slaFg }}">{{ b.sla }}</span>
+                </div>
+                <span style="font-size:15px;font-weight:600;line-height:1.3;color:#14181A;text-wrap:pretty">{{ b.title }}</span>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;color:#5E6159;background:#F1EFE8;padding:4px 8px;border-radius:6px">{{ b.sku }}</span>
+                  <span style="font-size:11.5px;font-weight:500;color:#5E6159;background:#F1EFE8;padding:4px 8px;border-radius:6px">{{ b.qty }}</span>
+                  <span style="font-size:11.5px;font-weight:500;color:#5E6159;background:#F1EFE8;padding:4px 8px;border-radius:6px">{{ b.line }}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:11px;font-weight:600;letter-spacing:.03em;padding:4px 8px;border-radius:6px;background:{{ b.stageBg }};color:{{ b.stageFg }}">{{ b.stage }}</span>
+                  <span style="font-size:11.5px;font-weight:500;color:#8A8D84">{{ b.meta }}</span>
+                </div>
+              </div>
+              <div style="display:flex;gap:1px;background:rgba(20,24,26,.08)">
+                <button style="flex:1;height:44px;border:none;background:#fff;font-family:Archivo,sans-serif;font-size:13px;font-weight:600;color:#5E6159;cursor:pointer" style-hover="background:#FBFAF7">Talep sahibine sor</button>
+                <button sc-camel-on-click="{{ b.onOpen }}" style="flex:1.2;height:44px;border:none;background:#1A2430;font-family:Archivo,sans-serif;font-size:13px;font-weight:600;color:#fff;cursor:pointer" style-hover="background:#101823">Süreci işle</button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isBuyerWork }}">
+      <div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+        <div style="flex:none;background:#1A2430;color:#fff;padding:58px 20px 18px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:13px">
+            <button sc-camel-on-click="{{ goBuyer }}" style="width:36px;height:36px;flex:none;border-radius:11px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);font-size:15px;color:#fff;cursor:pointer">←</button>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;color:rgba(255,255,255,.72)">{{ workCode }}</span>
+            <span style="margin-left:auto;font-size:10px;font-weight:600;padding:5px 9px;border-radius:999px;background:rgba(232,107,87,.2);color:#F2A394">{{ workUrgency }}</span>
+          </div>
+          <span style="display:block;font-size:18px;font-weight:700;line-height:1.3;letter-spacing:-0.3px;text-wrap:pretty">{{ workTitle }}</span>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:11px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#fff;background:rgba(255,255,255,.12);padding:5px 9px;border-radius:7px">{{ workSku }}</span>
+            <span style="font-size:11.5px;font-weight:600;color:#fff;background:rgba(255,255,255,.12);padding:5px 9px;border-radius:7px">{{ workQty }}</span>
+            <span style="font-size:11.5px;font-weight:600;color:#fff;background:rgba(255,255,255,.12);padding:5px 9px;border-radius:7px">İhtiyaç {{ workNeed }}</span>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:16px 16px 6px;display:flex;flex-direction:column;gap:9px">
+          <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84;padding:0 4px">Süreç aşaması</span>
+          <div style="display:flex;gap:5px;background:#EDEBE3;padding:4px;border-radius:13px">
+            <sc-for list="{{ stages }}" as="s" hint-placeholder-count="4">
+              <button sc-camel-on-click="{{ s.onPick }}" style="flex:1;padding:10px 3px;border-radius:10px;border:none;cursor:pointer;font-family:Archivo,sans-serif;font-size:11.5px;font-weight:600;background:{{ s.bg }};color:{{ s.fg }};box-shadow:{{ s.shadow }}">{{ s.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:14px 16px 6px;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;padding:0 4px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84">Teklifler</span>
+            <span style="font-size:11.5px;font-weight:600;color:#2E5FA3">{{ quoteCount }} tedarikçi</span>
+          </div>
+          <div style="border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:16px;overflow:hidden">
+            <sc-for list="{{ workQuotes }}" as="q" hint-placeholder-count="3">
+              <button sc-camel-on-click="{{ q.onPick }}" style="width:100%;text-align:left;border:none;border-bottom:1px solid rgba(20,24,26,.06);background:{{ q.bg }};padding:12px 14px;display:flex;align-items:center;gap:11px;cursor:pointer;font-family:Archivo,sans-serif">
+                <span style="width:18px;height:18px;flex:none;border-radius:99px;border:2px solid {{ q.ring }};background:{{ q.fill }}"></span>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                  <span style="font-size:13.5px;font-weight:600;color:#14181A">{{ q.name }}</span>
+                  <span style="font-size:11.5px;font-weight:500;color:#8A8D84">{{ q.meta }}</span>
+                </div>
+                <span style="flex:none;font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600;color:{{ q.priceColor }}">{{ q.price }}</span>
+              </button>
+            </sc-for>
+            <button style="width:100%;border:none;background:transparent;padding:12px 14px;display:flex;align-items:center;gap:9px;cursor:pointer;font-family:Archivo,sans-serif;font-size:13px;font-weight:600;color:#2E5FA3" style-hover="background:#FBFAF7">＋ Teklif ekle / e-posta ile talep et</button>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:14px 16px 6px;display:flex;flex-direction:column;gap:9px">
+          <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84;padding:0 4px">Sipariş bilgisi</span>
+          <div style="border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:16px;padding:13px 14px;display:flex;flex-direction:column;gap:11px">
+            <div style="display:flex;gap:9px">
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+                <span style="font-size:11px;font-weight:600;color:#8A8D84">Sipariş no</span>
+                <input value="{{ poNo }}" sc-camel-on-change="{{ onPo }}" placeholder="SAS-2026-…" style="height:42px;border:1px solid rgba(20,24,26,.13);border-radius:11px;padding:0 11px;outline:none;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#14181A">
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+                <span style="font-size:11px;font-weight:600;color:#8A8D84">Teslim tarihi</span>
+                <input value="{{ eta }}" sc-camel-on-change="{{ onEta }}" placeholder="17 Eyl" style="height:42px;border:1px solid rgba(20,24,26,.13);border-radius:11px;padding:0 11px;outline:none;font-family:Archivo,sans-serif;font-size:13px;color:#14181A">
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:10px;border-top:1px solid rgba(20,24,26,.07)">
+              <span style="font-size:12.5px;font-weight:500;color:#5E6159">Seçili tedarikçi toplamı</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:#17624A">{{ total }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:14px 16px 6px;display:flex;flex-direction:column;gap:9px">
+          <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84;padding:0 4px">Süreç notu · talep sahibine görünür</span>
+          <textarea value="{{ log }}" sc-camel-on-change="{{ onLog }}" placeholder="Örn. Anadolu Rulman ile anlaşıldı, kargo 16 Eyl'de çıkıyor…" style="border:1px solid rgba(20,24,26,.13);background:#fff;border-radius:14px;padding:12px;min-height:80px;resize:none;outline:none;font-family:Archivo,sans-serif;font-size:13.5px;line-height:1.5;color:#14181A"></textarea>
+          <div style="display:flex;gap:7px;flex-wrap:wrap">
+            <sc-for list="{{ snippets }}" as="s" hint-placeholder-count="3">
+              <button sc-camel-on-click="{{ s.onPick }}" style="border:1px solid rgba(20,24,26,.13);background:#fff;border-radius:999px;padding:7px 11px;cursor:pointer;font-family:Archivo,sans-serif;font-size:11.5px;font-weight:600;color:#5E6159" style-hover="border-color:#2E5FA3;color:#2E5FA3">{{ s.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:14px 16px 8px;display:flex;flex-direction:column;gap:9px">
+          <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84;padding:0 4px">İşlem geçmişi</span>
+          <div style="display:flex;flex-direction:column;gap:0">
+            <sc-for list="{{ history }}" as="h" hint-placeholder-count="3">
+              <div style="display:flex;gap:11px">
+                <div style="width:16px;flex:none;display:flex;flex-direction:column;align-items:center">
+                  <div style="width:9px;height:9px;border-radius:99px;background:{{ h.dot }};margin-top:5px"></div>
+                  <div style="flex:1;width:2px;background:{{ h.rail }};min-height:12px"></div>
+                </div>
+                <div style="flex:1;min-width:0;padding-bottom:13px;display:flex;flex-direction:column;gap:2px">
+                  <span style="font-size:12.5px;font-weight:600;color:#14181A;line-height:1.35;text-wrap:pretty">{{ h.text }}</span>
+                  <span style="font-size:11px;font-weight:500;color:#8A8D84">{{ h.meta }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:none;margin-top:auto;padding:12px 16px 28px;background:#F5F3EE;border-top:1px solid rgba(20,24,26,.08);display:flex;gap:9px">
+          <button style="width:52px;height:50px;flex:none;border-radius:14px;border:1px solid rgba(20,24,26,.13);background:#fff;font-size:16px;color:#14181A;cursor:pointer">⤓</button>
+          <button sc-camel-on-click="{{ saveProcess }}" style="flex:1;height:50px;border-radius:14px;border:none;background:#1A2430;color:#fff;font-family:Archivo,sans-serif;font-size:14.5px;font-weight:600;cursor:pointer" style-active="opacity:.88">{{ saveLabel }}</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isProfile }}">
+      <div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+        <div style="flex:none;background:#14201C;color:#fff;padding:58px 20px 20px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <div style="width:62px;height:62px;flex:none;border-radius:20px;background:#1B2B25;border:1px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#7FC6A4;letter-spacing:-0.5px">OY</div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+              <span style="font-size:19px;font-weight:700;letter-spacing:-0.3px">Okan Yalçın</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#7FC6A4">Bakım Teknisyeni · SC-4821</span>
+              <span style="font-size:11.5px;font-weight:500;color:rgba(255,255,255,.6)">Gıda Üretim Tesisi 2 · Mekanik Bakım</span>
+            </div>
+          </div>
+          <div style="margin-top:16px;padding:12px 13px;border-radius:13px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);display:flex;align-items:center;gap:11px">
+            <span style="width:8px;height:8px;flex:none;border-radius:99px;background:#7FC6A4;animation:pulsedot 1.6s infinite"></span>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:12.5px;font-weight:600;color:#fff">Vardiya B · aktif</span>
+              <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,.6)">16:00 – 24:00 · Devir 23:45</span>
+            </div>
+            <button sc-camel-on-click="{{ goApprove }}" style="flex:none;border:1px solid rgba(255,255,255,.22);background:transparent;border-radius:999px;padding:7px 12px;font-family:Archivo,sans-serif;font-size:11.5px;font-weight:600;color:#fff;cursor:pointer">Devret</button>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:16px 16px 6px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+          <div style="border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:14px;padding:12px 11px;display:flex;flex-direction:column;gap:3px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:21px;font-weight:600;line-height:1;color:#14181A">18</span>
+            <span style="font-size:10.5px;font-weight:500;color:#8A8D84;line-height:1.3">Bu ay<br>açılan talep</span>
+          </div>
+          <div style="border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:14px;padding:12px 11px;display:flex;flex-direction:column;gap:3px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:21px;font-weight:600;line-height:1;color:#17624A">%89</span>
+            <span style="font-size:10.5px;font-weight:500;color:#8A8D84;line-height:1.3">Onay<br>oranı</span>
+          </div>
+          <div style="border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:14px;padding:12px 11px;display:flex;flex-direction:column;gap:3px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:21px;font-weight:600;line-height:1;color:#14181A">1,4<span style="font-size:12px;color:#8A8D84"> gün</span></span>
+            <span style="font-size:10.5px;font-weight:500;color:#8A8D84;line-height:1.3">Ortalama<br>tedarik</span>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:10px 16px 6px;display:flex;flex-direction:column;gap:9px">
+          <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84;padding:0 4px">Yetki ve limitler</span>
+          <div style="border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:16px;overflow:hidden">
+            <div style="padding:13px 14px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid rgba(20,24,26,.06)">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <span style="font-size:12.5px;font-weight:500;color:#5E6159">Onaysız talep limiti</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;color:#14181A">₺940 / ₺1.500</span>
+              </div>
+              <div style="height:6px;border-radius:9px;background:#EDEBE3;overflow:hidden"><div style="width:63%;height:100%;background:#E0A22B"></div></div>
+              <span style="font-size:11px;font-weight:500;color:#8A8D84">Aylık limit 1 Ekim'de sıfırlanır.</span>
+            </div>
+            <div style="padding:12px 14px;display:flex;flex-wrap:wrap;gap:7px">
+              <span style="font-size:11.5px;font-weight:600;color:#17624A;background:#E4F0E9;padding:5px 10px;border-radius:999px">Talep açma</span>
+              <span style="font-size:11.5px;font-weight:600;color:#17624A;background:#E4F0E9;padding:5px 10px;border-radius:999px">Barkod okuma</span>
+              <span style="font-size:11.5px;font-weight:600;color:#17624A;background:#E4F0E9;padding:5px 10px;border-radius:999px">Stok görüntüleme</span>
+              <span style="font-size:11.5px;font-weight:600;color:#A8ABA1;background:#F1EFE8;padding:5px 10px;border-radius:999px">Onaylama ✕</span>
+              <span style="font-size:11.5px;font-weight:600;color:#A8ABA1;background:#F1EFE8;padding:5px 10px;border-radius:999px">Teklif girişi ✕</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:14px 16px 6px;display:flex;flex-direction:column;gap:9px">
+          <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84;padding:0 4px">Ayarlar</span>
+          <div style="border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:16px;overflow:hidden">
+            <sc-for list="{{ settings }}" as="s" hint-placeholder-count="4">
+              <button sc-camel-on-click="{{ s.onToggle }}" style="width:100%;text-align:left;border:none;border-bottom:1px solid rgba(20,24,26,.06);background:transparent;padding:13px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;font-family:Archivo,sans-serif" style-hover="background:#FBFAF7">
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                  <span style="font-size:13.5px;font-weight:600;color:#14181A">{{ s.label }}</span>
+                  <span style="font-size:11.5px;font-weight:500;color:#8A8D84;line-height:1.4">{{ s.hint }}</span>
+                </div>
+                <div style="flex:none;width:44px;height:26px;border-radius:999px;padding:3px;background:{{ s.track }};display:flex;justify-content:{{ s.align }};transition:background .18s">
+                  <div style="width:20px;height:20px;border-radius:99px;background:#fff;box-shadow:0 1px 2px rgba(20,24,26,.28)"></div>
+                </div>
+              </button>
+            </sc-for>
+            <button style="width:100%;text-align:left;border:none;background:transparent;padding:13px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;font-family:Archivo,sans-serif" style-hover="background:#FBFAF7">
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:13.5px;font-weight:600;color:#14181A">Uygulama dili</span>
+                <span style="font-size:11.5px;font-weight:500;color:#8A8D84">Türkçe</span>
+              </div>
+              <span style="font-size:15px;color:#A8ABA1">›</span>
+            </button>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:14px 16px 24px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 13px;border-radius:14px;border:1px dashed rgba(20,24,26,.18)">
+            <span style="width:8px;height:8px;flex:none;border-radius:99px;background:#17624A"></span>
+            <span style="flex:1;font-size:11.5px;font-weight:500;color:#5E6159;line-height:1.45">Tüm taslaklar eşitlendi · son senkron 2 dk önce</span>
+          </div>
+          <button style="height:48px;border-radius:14px;border:1px solid rgba(179,57,44,.32);background:#FDF1EF;font-family:Archivo,sans-serif;font-size:13.5px;font-weight:600;color:#B3392C;cursor:pointer">Oturumu kapat</button>
+          <span style="text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#A8ABA1">SATINALMA MOBİL · v0.1 (build 24)</span>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ showTabs }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:none;background:rgba(245,243,238,.92);backdrop-filter:blur(18px);border-top:1px solid rgba(20,24,26,.09);padding:8px 8px 30px;display:flex">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+          <button sc-camel-on-click="{{ t.onPick }}" style="flex:1;border:none;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0;font-family:Archivo,sans-serif">
+            <span style="font-size:17px;line-height:1;color:{{ t.color }}">{{ t.icon }}</span>
+            <span style="font-size:10px;font-weight:600;color:{{ t.color }}">{{ t.label }}</span>
+          </button>
+        </sc-for>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ scanning }}">
+      <div style="position:absolute;inset:0;background:#0B0F0D;display:flex;flex-direction:column;z-index:80">
+        <div style="padding:58px 20px 12px;display:flex;align-items:center;gap:10px">
+          <button sc-camel-on-click="{{ closeScan }}" style="width:36px;height:36px;flex:none;border-radius:11px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);font-size:15px;color:#fff;cursor:pointer">✕</button>
+          <span style="font-size:15px;font-weight:600;color:#fff">Barkod / QR okut</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:0 30px">
+          <div style="width:252px;height:180px;border-radius:20px;position:relative;background:rgba(255,255,255,.04);overflow:hidden">
+            <div style="position:absolute;top:0;left:0;width:44px;height:44px;border-top:3px solid #7FC6A4;border-left:3px solid #7FC6A4;border-radius:18px 0 0 0"></div>
+            <div style="position:absolute;top:0;right:0;width:44px;height:44px;border-top:3px solid #7FC6A4;border-right:3px solid #7FC6A4;border-radius:0 18px 0 0"></div>
+            <div style="position:absolute;bottom:0;left:0;width:44px;height:44px;border-bottom:3px solid #7FC6A4;border-left:3px solid #7FC6A4;border-radius:0 0 0 18px"></div>
+            <div style="position:absolute;bottom:0;right:0;width:44px;height:44px;border-bottom:3px solid #7FC6A4;border-right:3px solid #7FC6A4;border-radius:0 0 18px 0"></div>
+            <div style="position:absolute;top:0;left:12px;right:12px;height:2px;background:#7FC6A4;box-shadow:0 0 14px #7FC6A4;animation:scanline 1.4s ease-in-out infinite alternate"></div>
+          </div>
+          <span style="font-size:13px;font-weight:500;color:rgba(255,255,255,.72);text-align:center;line-height:1.5">Ekipman etiketini veya raf barkodunu<br>çerçeveye getirin</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="width:7px;height:7px;border-radius:99px;background:#7FC6A4;animation:pulsedot 1s infinite"></span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#7FC6A4">OKUNUYOR…</span>
+          </div>
+        </div>
+        <button sc-camel-on-click="{{ manualEntry }}" style="margin:0 24px 40px;height:50px;border-radius:14px;border:1px solid rgba(255,255,255,.22);background:transparent;color:#fff;font-family:Archivo,sans-serif;font-size:14px;font-weight:600;cursor:pointer">Elle kod gir</button>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ sent }}">
+      <div style="position:absolute;inset:0;background:#14201C;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:0 34px;z-index:90;text-align:center">
+        <span style="width:74px;height:74px;border-radius:99px;background:#17624A;color:#fff;font-size:32px;display:flex;align-items:center;justify-content:center;animation:popin .34s ease both">✓</span>
+        <span style="font-size:20px;font-weight:700;color:#fff;letter-spacing:-0.3px">Talep gönderildi</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:.08em;color:#7FC6A4">TLP-2417</span>
+        <span style="font-size:13px;font-weight:500;color:rgba(255,255,255,.68);line-height:1.55">Serkan Demir'e onaya düştü. Kritik talepler 2 saat içinde yanıtlanır.</span>
+        <div style="display:flex;flex-direction:column;gap:9px;align-self:stretch;margin-top:12px">
+          <button sc-camel-on-click="{{ goDetail }}" style="height:50px;border-radius:14px;border:none;background:#fff;color:#14181A;font-family:Archivo,sans-serif;font-size:14.5px;font-weight:600;cursor:pointer">Talebi görüntüle</button>
+          <button sc-camel-on-click="{{ goHome }}" style="height:50px;border-radius:14px;border:1px solid rgba(255,255,255,.22);background:transparent;color:#fff;font-family:Archivo,sans-serif;font-size:14.5px;font-weight:600;cursor:pointer">Ana ekrana dön</button>
+        </div>
+      </div>
+      </sc-if>
+
+    </div>
+  </x-import>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+  <div style="display:flex;align-items:center;gap:8px;padding-left:4px">
+    <span style="width:7px;height:7px;border-radius:99px;background:#2E5FA3"></span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#5E6159">Satınalma uzmanı</span>
+  </div>
+  <x-import component-from-global-scope="IOSDevice" from="ios-frame.jsx" hint-size="402px,874px">
+    <div style="height:100%;display:flex;flex-direction:column;background:#F5F3EE;font-family:Archivo,system-ui,sans-serif;position:relative;overflow:hidden">
+
+      <sc-if value="{{ isBuyer2 }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+        <div style="flex:none;background:#1A2430;color:#fff;padding:58px 20px 18px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <span style="font-size:20px;font-weight:700;letter-spacing:-0.3px">Satınalma Masası</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#8FB6D8">Ayşe Tuna · Satınalma Uzmanı</span>
+            </div>
+            <span style="flex:none;display:flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:7px 11px;font-size:11px;font-weight:600;color:#fff">
+              <span style="width:6px;height:6px;border-radius:99px;background:#7FC6A4;animation:pulsedot 1.6s infinite"></span>Canlı
+            </span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin-top:18px;background:rgba(255,255,255,.12);border-radius:14px;overflow:hidden">
+            <div style="background:#22303E;padding:12px;display:flex;flex-direction:column;gap:2px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;line-height:1;color:#E0A22B">4</span>
+              <span style="font-size:10.5px;font-weight:500;color:rgba(255,255,255,.66);line-height:1.3">Yeni<br>düşen</span>
+            </div>
+            <div style="background:#22303E;padding:12px;display:flex;flex-direction:column;gap:2px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;line-height:1;color:#8FB6D8">8</span>
+              <span style="font-size:10.5px;font-weight:500;color:rgba(255,255,255,.66);line-height:1.3">Teklif<br>aşamasında</span>
+            </div>
+            <div style="background:#22303E;padding:12px;display:flex;flex-direction:column;gap:2px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;line-height:1;color:#E86B57">2</span>
+              <span style="font-size:10.5px;font-weight:500;color:rgba(255,255,255,.66);line-height:1.3">SLA<br>aşımı</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:none;display:flex;gap:6px;padding:14px 16px 12px;overflow-x:auto;overflow-y:hidden;align-items:center">
+          <sc-for list="{{ buyerFilters }}" as="f" hint-placeholder-count="4">
+            <button sc-camel-on-click="{{ f.onPick }}" style="flex:0 0 auto;white-space:nowrap;border-radius:999px;font-family:Archivo,sans-serif;font-size:12.5px;font-weight:600;padding:8px 13px;cursor:pointer;border:1px solid {{ f.border }};background:{{ f.bg }};color:{{ f.fg }}">{{ f.label }}</button>
+          </sc-for>
+        </div>
+
+        <div style="flex:none;padding:0 16px 24px;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ buyerQueue2 }}" as="b" hint-placeholder-count="3">
+            <div style="border:1px solid {{ b.border }};background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(20,24,26,.05)">
+              <div style="padding:13px 14px 12px;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.05em;color:#8A8D84">{{ b.code }}</span>
+                  <span style="font-size:10px;font-weight:600;padding:4px 8px;border-radius:999px;background:{{ b.slaBg }};color:{{ b.slaFg }}">{{ b.sla }}</span>
+                </div>
+                <span style="font-size:15px;font-weight:600;line-height:1.3;color:#14181A;text-wrap:pretty">{{ b.title }}</span>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;color:#5E6159;background:#F1EFE8;padding:4px 8px;border-radius:6px">{{ b.sku }}</span>
+                  <span style="font-size:11.5px;font-weight:500;color:#5E6159;background:#F1EFE8;padding:4px 8px;border-radius:6px">{{ b.qty }}</span>
+                  <span style="font-size:11.5px;font-weight:500;color:#5E6159;background:#F1EFE8;padding:4px 8px;border-radius:6px">{{ b.line }}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:11px;font-weight:600;letter-spacing:.03em;padding:4px 8px;border-radius:6px;background:{{ b.stageBg }};color:{{ b.stageFg }}">{{ b.stage }}</span>
+                  <span style="font-size:11.5px;font-weight:500;color:#8A8D84">{{ b.meta }}</span>
+                </div>
+              </div>
+              <div style="display:flex;gap:1px;background:rgba(20,24,26,.08)">
+                <button style="flex:1;height:44px;border:none;background:#fff;font-family:Archivo,sans-serif;font-size:13px;font-weight:600;color:#5E6159;cursor:pointer" style-hover="background:#FBFAF7">Talep sahibine sor</button>
+                <button sc-camel-on-click="{{ b.onOpen }}" style="flex:1.2;height:44px;border:none;background:#1A2430;font-family:Archivo,sans-serif;font-size:13px;font-weight:600;color:#fff;cursor:pointer" style-hover="background:#101823">Süreci işle</button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isBuyerWork2 }}">
+      <div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+        <div style="flex:none;background:#1A2430;color:#fff;padding:58px 20px 18px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:13px">
+            <button sc-camel-on-click="{{ goBuyer2 }}" style="width:36px;height:36px;flex:none;border-radius:11px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);font-size:15px;color:#fff;cursor:pointer">←</button>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;color:rgba(255,255,255,.72)">{{ workCode }}</span>
+            <span style="margin-left:auto;font-size:10px;font-weight:600;padding:5px 9px;border-radius:999px;background:rgba(232,107,87,.2);color:#F2A394">{{ workUrgency }}</span>
+          </div>
+          <span style="display:block;font-size:18px;font-weight:700;line-height:1.3;letter-spacing:-0.3px;text-wrap:pretty">{{ workTitle }}</span>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:11px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#fff;background:rgba(255,255,255,.12);padding:5px 9px;border-radius:7px">{{ workSku }}</span>
+            <span style="font-size:11.5px;font-weight:600;color:#fff;background:rgba(255,255,255,.12);padding:5px 9px;border-radius:7px">{{ workQty }}</span>
+            <span style="font-size:11.5px;font-weight:600;color:#fff;background:rgba(255,255,255,.12);padding:5px 9px;border-radius:7px">İhtiyaç {{ workNeed }}</span>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:16px 16px 6px;display:flex;flex-direction:column;gap:9px">
+          <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84;padding:0 4px">Süreç aşaması</span>
+          <div style="display:flex;gap:5px;background:#EDEBE3;padding:4px;border-radius:13px">
+            <sc-for list="{{ stages }}" as="s" hint-placeholder-count="4">
+              <button sc-camel-on-click="{{ s.onPick }}" style="flex:1;padding:10px 3px;border-radius:10px;border:none;cursor:pointer;font-family:Archivo,sans-serif;font-size:11.5px;font-weight:600;background:{{ s.bg }};color:{{ s.fg }};box-shadow:{{ s.shadow }}">{{ s.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:14px 16px 6px;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;padding:0 4px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84">Teklifler</span>
+            <span style="font-size:11.5px;font-weight:600;color:#2E5FA3">{{ quoteCount }} tedarikçi</span>
+          </div>
+          <div style="border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:16px;overflow:hidden">
+            <sc-for list="{{ workQuotes }}" as="q" hint-placeholder-count="3">
+              <button sc-camel-on-click="{{ q.onPick }}" style="width:100%;text-align:left;border:none;border-bottom:1px solid rgba(20,24,26,.06);background:{{ q.bg }};padding:12px 14px;display:flex;align-items:center;gap:11px;cursor:pointer;font-family:Archivo,sans-serif">
+                <span style="width:18px;height:18px;flex:none;border-radius:99px;border:2px solid {{ q.ring }};background:{{ q.fill }}"></span>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                  <span style="font-size:13.5px;font-weight:600;color:#14181A">{{ q.name }}</span>
+                  <span style="font-size:11.5px;font-weight:500;color:#8A8D84">{{ q.meta }}</span>
+                </div>
+                <span style="flex:none;font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600;color:{{ q.priceColor }}">{{ q.price }}</span>
+              </button>
+            </sc-for>
+            <button style="width:100%;border:none;background:transparent;padding:12px 14px;display:flex;align-items:center;gap:9px;cursor:pointer;font-family:Archivo,sans-serif;font-size:13px;font-weight:600;color:#2E5FA3" style-hover="background:#FBFAF7">＋ Teklif ekle / e-posta ile talep et</button>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:14px 16px 6px;display:flex;flex-direction:column;gap:9px">
+          <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84;padding:0 4px">Sipariş bilgisi</span>
+          <div style="border:1px solid rgba(20,24,26,.09);background:#fff;border-radius:16px;padding:13px 14px;display:flex;flex-direction:column;gap:11px">
+            <div style="display:flex;gap:9px">
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+                <span style="font-size:11px;font-weight:600;color:#8A8D84">Sipariş no</span>
+                <input value="{{ poNo }}" sc-camel-on-change="{{ onPo }}" placeholder="SAS-2026-…" style="height:42px;border:1px solid rgba(20,24,26,.13);border-radius:11px;padding:0 11px;outline:none;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#14181A">
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+                <span style="font-size:11px;font-weight:600;color:#8A8D84">Teslim tarihi</span>
+                <input value="{{ eta }}" sc-camel-on-change="{{ onEta }}" placeholder="17 Eyl" style="height:42px;border:1px solid rgba(20,24,26,.13);border-radius:11px;padding:0 11px;outline:none;font-family:Archivo,sans-serif;font-size:13px;color:#14181A">
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:10px;border-top:1px solid rgba(20,24,26,.07)">
+              <span style="font-size:12.5px;font-weight:500;color:#5E6159">Seçili tedarikçi toplamı</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:#17624A">{{ total }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:14px 16px 6px;display:flex;flex-direction:column;gap:9px">
+          <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84;padding:0 4px">Süreç notu · talep sahibine görünür</span>
+          <textarea value="{{ log }}" sc-camel-on-change="{{ onLog }}" placeholder="Örn. Anadolu Rulman ile anlaşıldı, kargo 16 Eyl'de çıkıyor…" style="border:1px solid rgba(20,24,26,.13);background:#fff;border-radius:14px;padding:12px;min-height:80px;resize:none;outline:none;font-family:Archivo,sans-serif;font-size:13.5px;line-height:1.5;color:#14181A"></textarea>
+          <div style="display:flex;gap:7px;flex-wrap:wrap">
+            <sc-for list="{{ snippets }}" as="s" hint-placeholder-count="3">
+              <button sc-camel-on-click="{{ s.onPick }}" style="border:1px solid rgba(20,24,26,.13);background:#fff;border-radius:999px;padding:7px 11px;cursor:pointer;font-family:Archivo,sans-serif;font-size:11.5px;font-weight:600;color:#5E6159" style-hover="border-color:#2E5FA3;color:#2E5FA3">{{ s.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:14px 16px 8px;display:flex;flex-direction:column;gap:9px">
+          <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8A8D84;padding:0 4px">İşlem geçmişi</span>
+          <div style="display:flex;flex-direction:column;gap:0">
+            <sc-for list="{{ history }}" as="h" hint-placeholder-count="3">
+              <div style="display:flex;gap:11px">
+                <div style="width:16px;flex:none;display:flex;flex-direction:column;align-items:center">
+                  <div style="width:9px;height:9px;border-radius:99px;background:{{ h.dot }};margin-top:5px"></div>
+                  <div style="flex:1;width:2px;background:{{ h.rail }};min-height:12px"></div>
+                </div>
+                <div style="flex:1;min-width:0;padding-bottom:13px;display:flex;flex-direction:column;gap:2px">
+                  <span style="font-size:12.5px;font-weight:600;color:#14181A;line-height:1.35;text-wrap:pretty">{{ h.text }}</span>
+                  <span style="font-size:11px;font-weight:500;color:#8A8D84">{{ h.meta }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:none;margin-top:auto;padding:12px 16px 28px;background:#F5F3EE;border-top:1px solid rgba(20,24,26,.08);display:flex;gap:9px">
+          <button style="width:52px;height:50px;flex:none;border-radius:14px;border:1px solid rgba(20,24,26,.13);background:#fff;font-size:16px;color:#14181A;cursor:pointer">⤓</button>
+          <button sc-camel-on-click="{{ saveProcess }}" style="flex:1;height:50px;border-radius:14px;border:none;background:#1A2430;color:#fff;font-family:Archivo,sans-serif;font-size:14.5px;font-weight:600;cursor:pointer" style-active="opacity:.88">{{ saveLabel }}</button>
+        </div>
+      </div>
+      </sc-if>
+
+    </div>
+  </x-import>
+  </div>
+  </div>
+
+  <p style="max-width:56ch;margin:0;font-size:12px;line-height:1.6;color:#6E7168;text-align:center;text-wrap:pretty">Sonraki adımlar: depo stok rezervasyonu, çevrimdışı taslak kuyruğu, ERP stok kodu eşleştirme ve Android görünümü.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:760,&quot;height&quot;:1100},&quot;showStats&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Ana ekran&quot;},&quot;compactList&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Ana ekran&quot;}}">
+const S={onay:['#FBF1DC','#8A6412'],teklif:['#E7EEF8','#2E5FA3'],siparis:['#E4F0E9','#17624A'],teslim:['#EDEBE3','#5E6159'],red:['#FDF1EF','#B3392C']};
+const URG={'Kritik':'#E86B57','Yüksek':'#D08A1E','Normal':'#8FA398'};
+
+class Component extends DCLogic {
+  state={toggles:{push:true,critical:true,beep:false,offline:true},bFilter:'Teklif toplanıyor',screen2:'buyer',work:null,stage:'Teklif',supplier:'Anadolu Rulman A.Ş.',poNo:'',eta:'17 Eyl',log:'',saved:false,entries:[],screen:'home',step:1,filter:'Tümü',qty:4,unit:'adet',date:'3 gün',urgency:'Kritik',machine:'Dolum Hattı 2',note:'',query:'',picked:null,scanning:false,sent:false,approved:[]};
+
+  go=(screen)=>this.setState({screen,scanning:false,sent:false});
+
+  reqs(){return [
+    {code:'TLP-2416',title:'Dolum hattı taşıyıcı bant rulmanı',sku:'RLM-6204-2Z',qty:'4 adet',line:'Dolum Hattı 2',need:'14 Eyl',urgency:'Kritik',status:'Şef onayında',s:'onay',late:true},
+    {code:'TLP-2415',title:'Pastörizatör sıcaklık sensörü PT100',sku:'SNS-PT100-3M',qty:'2 adet',line:'Pastörizatör 1',need:'18 Eyl',urgency:'Yüksek',status:'Teklif toplanıyor',s:'teklif'},
+    {code:'TLP-2412',title:'Gıda sınıfı zincir yağlayıcı (NSF H1)',sku:'YAG-H1-5L',qty:'5 L',line:'Paketleme 3',need:'22 Eyl',urgency:'Normal',status:'Sipariş verildi',s:'siparis'},
+    {code:'TLP-2408',title:'Paketleme çene ısıtıcı rezistansı',sku:'REZ-220-450W',qty:'6 adet',line:'Paketleme 3',need:'Teslim',urgency:'Yüksek',status:'Teslim edildi',s:'teslim'},
+    {code:'TLP-2405',title:'Hijyenik conta EPDM DN80',sku:'CNT-EPDM-80',qty:'10 adet',line:'CIP Hattı',need:'—',urgency:'Normal',status:'Reddedildi',s:'red'}];}
+
+  buyers(){return [
+    {code:'TLP-2416',title:'Dolum hattı taşıyıcı bant rulmanı',sku:'RLM-6204-2Z',qty:'4 adet',line:'Dolum Hattı 2',need:'14 Eyl',urgency:'Kritik',group:'Teklif toplanıyor',stage:'Teklif toplama',stageTone:'quote',meta:'2/3 teklif · 2 gün',late:true},
+    {code:'TLP-2417',title:'CIP pompası salmastra takımı',sku:'SLM-CIP-40',qty:'2 takım',line:'CIP Hattı',need:'20 Eyl',urgency:'Yüksek',group:'Yeni düşen',stage:'Yeni',stageTone:'new',meta:'1 sa önce düştü'},
+    {code:'TLP-2419',title:'Paletleyici vakum pedi (gıda uyumlu)',sku:'VKM-PED-80',qty:'8 adet',line:'Paketleme 3',need:'25 Eyl',urgency:'Normal',group:'Yeni düşen',stage:'Yeni',stageTone:'new',meta:'3 sa önce düştü'},
+    {code:'TLP-2415',title:'Pastörizatör sıcaklık sensörü PT100',sku:'SNS-PT100-3M',qty:'2 adet',line:'Pastörizatör 1',need:'18 Eyl',urgency:'Yüksek',group:'Teklif toplanıyor',stage:'Teklif toplama',stageTone:'quote',meta:'3/3 teklif · karar bekliyor'},
+    {code:'TLP-2412',title:'Gıda sınıfı zincir yağlayıcı (NSF H1)',sku:'YAG-H1-5L',qty:'5 L',line:'Paketleme 3',need:'22 Eyl',urgency:'Normal',group:'Siparişte',stage:'Sipariş verildi',stageTone:'order',meta:'SAS-2026-0418 · kargoda'},
+    {code:'TLP-2402',title:'Hijyenik kelebek vana DN65',sku:'VNA-DN65-SS',qty:'3 adet',line:'Dolum Hattı 1',need:'11 Eyl',urgency:'Kritik',group:'SLA riski',stage:'Teklif toplama',stageTone:'quote',meta:'4 gün gecikme · eskalasyon',late:true}];}
+
+  chip(active){return active?{bg:'#14181A',fg:'#fff',border:'#14181A'}:{bg:'#fff',fg:'#5E6159',border:'rgba(20,24,26,.13)'};}
+
+  renderVals(){
+    const st=this.state, sc=st.screen;
+    const work=st.work||this.buyers()[0];
+    const showStats=this.props.showStats!==false, compact=this.props.compactList===true;
+    const stepNames={1:'Malzeme',2:'Detay',3:'Özet'};
+    const catalog=[
+      {name:'Rulman 6204-2Z (paslanmaz)',sku:'RLM-6204-2Z',stock:'Stok yok',ok:false},
+      {name:'Taşıyıcı bant kayışı 80 mm',sku:'BNT-80-PU',stock:'12 adet',ok:true},
+      {name:'Rulman yatağı UCP 204',sku:'YTK-UCP204',stock:'3 adet',ok:true},
+      {name:'Gıda sınıfı gres NSF H1',sku:'GRS-H1-400G',stock:'8 tüp',ok:true}];
+    const q=st.query.trim().toLowerCase();
+    const cat=catalog.filter(c=>!q||c.name.toLowerCase().includes(q)||c.sku.toLowerCase().includes(q));
+    const picked=st.picked||catalog[0];
+    const pend=[
+      {code:'TLP-2416',title:'Dolum hattı taşıyıcı bant rulmanı',qty:'4 adet',line:'Dolum Hattı 2',est:'≈ ₺3.240',urgency:'Kritik',by:'Okan Yalçın · 12 Eyl 07:42 · Hat duruşu riski'},
+      {code:'TLP-2417',title:'CIP pompası salmastra takımı',qty:'2 takım',line:'CIP Hattı',est:'≈ ₺7.900',urgency:'Yüksek',by:'Meral Koç · 12 Eyl 06:10 · Planlı bakım'}]
+      .filter(p=>!st.approved.includes(p.code));
+    const tl=[
+      {title:'Talep oluşturuldu',meta:'12 Eyl 07:42 · Okan Yalçın',st:'done'},
+      {title:'Vardiya şefi onayı',meta:'12 Eyl 08:15 · Serkan Demir onayladı',st:'done'},
+      {title:'Stok kontrolü',meta:'12 Eyl 09:03 · Depo: stokta yok',st:'done'},
+      {title:'Teklif toplama',meta:'Devam ediyor · 2/3 teklif alındı',st:'now'},
+      {title:'Sipariş',meta:'Bekliyor',st:'todo'},
+      {title:'Hatta teslim',meta:'Tahmini 17 Eyl',st:'todo',last:true}];
+
+    return {
+      showStats, verbose:!compact,
+      isHome:sc==='home', isNew:sc==='new', isDetail:sc==='detail', isApprove:sc==='approve', isNotif:sc==='notif',
+      isProfile:sc==='profil', isBuyer:sc==='buyer', isBuyerWork:sc==='buyerWork',
+      goBuyer:()=>this.go('buyer'), goBuyerWork:()=>this.go('buyerWork'),
+      isBuyer2:st.screen2==='buyer', isBuyerWork2:st.screen2==='buyerWork',
+      goBuyer2:()=>this.setState({screen2:'buyer'}),
+      buyerQueue2:this.buyers().filter(b=>b.group===st.bFilter).map(b=>({...b,
+        border:b.late?'rgba(232,107,87,.4)':'rgba(20,24,26,.09)',
+        sla:b.late?'SLA aşıldı':'SLA içinde',
+        slaBg:b.late?'#FDF1EF':'#EDEBE3', slaFg:b.late?'#B3392C':'#5E6159',
+        stageBg:b.stageTone==='new'?'#FBF1DC':b.stageTone==='quote'?'#E7EEF8':'#E4F0E9',
+        stageFg:b.stageTone==='new'?'#8A6412':b.stageTone==='quote'?'#2E5FA3':'#17624A',
+        onOpen:()=>this.setState({screen2:'buyerWork',work:b})})),
+      buyerFilters:['Yeni düşen','Teklif toplanıyor','Siparişte','SLA riski'].map(label=>({label,...this.chip(st.bFilter===label),onPick:()=>this.setState({bFilter:label})})),
+      buyerQueue:this.buyers().filter(b=>b.group===st.bFilter).map(b=>({...b,
+        border:b.late?'rgba(232,107,87,.4)':'rgba(20,24,26,.09)',
+        sla:b.late?'SLA aşıldı':'SLA içinde',
+        slaBg:b.late?'#FDF1EF':'#EDEBE3', slaFg:b.late?'#B3392C':'#5E6159',
+        stageBg:b.stageTone==='new'?'#FBF1DC':b.stageTone==='quote'?'#E7EEF8':'#E4F0E9',
+        stageFg:b.stageTone==='new'?'#8A6412':b.stageTone==='quote'?'#2E5FA3':'#17624A',
+        onOpen:()=>this.setState({screen:'buyerWork',work:b})})),
+      workCode:work.code, workTitle:work.title, workSku:work.sku, workQty:work.qty, workNeed:work.need, workUrgency:work.urgency,
+      stages:['Teklif','Onay','Sipariş','Teslim'].map(label=>{const a=st.stage===label;
+        return {label,bg:a?'#fff':'transparent',fg:a?'#1A2430':'#7A7C74',shadow:a?'0 1px 3px rgba(20,24,26,.14)':'none',onPick:()=>this.setState({stage:label})};}),
+      quoteCount:3,
+      workQuotes:[
+        {name:'Anadolu Rulman A.Ş.',meta:'Teslim 2 gün · 12 ay garanti · KDV dahil',price:'₺3.240'},
+        {name:'Teknik Yedek Ltd.',meta:'Teslim 1 gün · 6 ay garanti',price:'₺3.880'},
+        {name:'Mega Endüstri',meta:'Teklif bekleniyor · hatırlatma gönderildi',price:'—'}
+      ].map(q=>{const a=st.supplier===q.name;
+        return {...q,bg:a?'#F4F7FB':'#fff',ring:a?'#2E5FA3':'#D3D0C6',fill:a?'#2E5FA3':'#fff',
+          priceColor:a?'#2E5FA3':'#14181A',onPick:()=>this.setState({supplier:q.name})};}),
+      poNo:st.poNo, onPo:(e)=>this.setState({poNo:e.target.value}),
+      eta:st.eta, onEta:(e)=>this.setState({eta:e.target.value}),
+      total:st.supplier==='Teknik Yedek Ltd.'?'₺15.520':'₺12.960',
+      log:st.log, onLog:(e)=>this.setState({log:e.target.value,saved:false}),
+      snippets:[
+        {label:'Tedarikçi teyit etti'},{label:'Kargoya verildi'},{label:'Fiyat revize bekleniyor'},{label:'Alternatif ürün önerildi'}
+      ].map(s=>({...s,onPick:()=>this.setState({log:(st.log?st.log+' ':'')+s.label+'.',saved:false})})),
+      saveLabel:st.saved?'Süreç kaydedildi ✓':'Süreci kaydet ve bildir',
+      saveProcess:()=>this.setState({saved:true,entries:[{text:(st.log||'Aşama güncellendi: '+st.stage),meta:'şimdi · Ayşe Tuna · '+st.stage}].concat(st.entries)}),
+      history:st.entries.concat([
+        {text:'Teklif talebi 3 tedarikçiye gönderildi',meta:'12 Eyl 10:20 · Ayşe Tuna'},
+        {text:'Talep satınalmaya düştü (şef onayı sonrası)',meta:'12 Eyl 08:15 · Sistem'},
+        {text:'Depo stok kontrolü: stokta yok',meta:'12 Eyl 09:03 · Depo',last:true}
+      ]).map((h,i,arr)=>({...h,dot:i===0?'#2E5FA3':'#C6C8BF',rail:i===arr.length-1?'transparent':'#DEDBD1'})),
+      showTabs:sc==='home'||sc==='approve'||sc==='profil',
+      settings:[
+        {k:'push',label:'Anlık bildirimler',hint:'Onay ve teklif hareketleri'},
+        {k:'critical',label:'Kritik talepler için zil',hint:'Sessiz modda da çalar'},
+        {k:'beep',label:'Barkod okuma sesi',hint:'Okuma başarılı olduğunda'},
+        {k:'offline',label:'Çevrimdışı taslak',hint:'Şebeke yokken kaydet, sonra gönder'}
+      ].map(s=>{const on=!!st.toggles[s.k];
+        return {...s,track:on?'#17624A':'#DEDBD1',align:on?'flex-end':'flex-start',
+          onToggle:()=>this.setState({toggles:Object.assign({},st.toggles,{[s.k]:!on})})};}),
+      scanning:st.scanning, sent:st.sent,
+      goHome:()=>this.go('home'), goNew:()=>this.setState({screen:'new',step:1,scanning:false,sent:false}),
+      goDetail:()=>this.go('detail'), goApprove:()=>this.go('approve'), goNotif:()=>this.go('notif'),
+      goScan:()=>{this.setState({scanning:true});clearTimeout(this._t);this._t=setTimeout(()=>this.setState({scanning:false,screen:'new',step:2,picked:catalog[0]}),1900);},
+      closeScan:()=>{clearTimeout(this._t);this.setState({scanning:false});},
+      manualEntry:()=>{clearTimeout(this._t);this.setState({scanning:false,screen:'new',step:1});},
+
+      filters:['Tümü','Onay bekleyen','Tedarikte','Kritik'].map(label=>({label,...this.chip(st.filter===label),onPick:()=>this.setState({filter:label})})),
+      visibleRequests:this.reqs().filter(r=>st.filter==='Tümü'||(st.filter==='Onay bekleyen'&&r.s==='onay')||(st.filter==='Tedarikte'&&(r.s==='teklif'||r.s==='siparis'))||(st.filter==='Kritik'&&r.urgency==='Kritik')).map(r=>({
+        ...r,statusBg:S[r.s][0],statusFg:S[r.s][1],urgColor:URG[r.urgency],
+        dateColor:r.late?'#B3392C':'#5E6159',onOpen:()=>this.go('detail')})),
+
+      stepNo:st.step, stepName:stepNames[st.step],
+      bar1:'#17624A', bar2:st.step>1?'#17624A':'#DEDBD1', bar3:st.step>2?'#17624A':'#DEDBD1',
+      step1:st.step===1, step2:st.step===2, step3:st.step===3,
+      nextLabel:st.step===3?'Onaya gönder':'Devam',
+      nextBg:st.step===3?'#17624A':'#14181A',
+      next:()=>st.step===3?this.setState({sent:true}):this.setState({step:st.step+1}),
+      back:()=>st.step===1?this.go('home'):this.setState({step:st.step-1}),
+      toStep1:()=>this.setState({step:1}),
+      resultCount:cat.length, catalog:cat.map(c=>({...c,stockBg:c.ok?'#E4F0E9':'#FDF1EF',stockFg:c.ok?'#17624A':'#B3392C',onPick:()=>this.setState({picked:c,step:2})})),
+      pickCustom:()=>this.setState({picked:{name:'Serbest tanım — teknisyen girişi',sku:'SERBEST'},step:2}),
+      pickedName:picked.name, pickedSku:picked.sku,
+      query:st.query, onQuery:(e)=>this.setState({query:e.target.value}),
+      note:st.note, onNote:(e)=>this.setState({note:e.target.value}),
+      qty:st.qty, inc:()=>this.setState({qty:st.qty+1}), dec:()=>this.setState({qty:Math.max(1,st.qty-1)}),
+      units:['adet','takım','L'].map(label=>({label,...this.chip(st.unit===label),onPick:()=>this.setState({unit:label})})),
+      dates:[{label:'Bugün',date:'12 Eyl'},{label:'3 gün',date:'15 Eyl'},{label:'1 hafta',date:'19 Eyl'}].map(d=>{
+        const a=st.date===d.label;return {...d,bg:a?'#14181A':'#fff',fg:a?'#fff':'#14181A',sub:a?'rgba(255,255,255,.6)':'#8A8D84',border:a?'#14181A':'rgba(20,24,26,.13)',onPick:()=>this.setState({date:d.label})};}),
+      urgencies:['Normal','Yüksek','Kritik'].map(label=>{const a=st.urgency===label;
+        return {label,bg:a?'#fff':'transparent',fg:a?(label==='Kritik'?'#B3392C':'#14181A'):'#7A7C74',shadow:a?'0 1px 3px rgba(20,24,26,.14)':'none',onPick:()=>this.setState({urgency:label})};}),
+      machines:['Dolum Hattı 2','Pastörizatör 1','Paketleme 3','CIP Hattı'].map(label=>({label,...this.chip(st.machine===label),onPick:()=>this.setState({machine:label})})),
+      summary:[{k:'Miktar',v:st.qty+' '+st.unit},{k:'İhtiyaç tarihi',v:st.date+' içinde'},{k:'Aciliyet',v:st.urgency},{k:'Ekipman',v:st.machine},{k:'Ek',v:'2 fotoğraf'},{k:'Maliyet merkezi',v:'MM-2140 Bakım'}],
+
+      timeline:tl.map(t=>({...t,
+        dot:t.st==='done'?'#17624A':t.st==='now'?'#E0A22B':'#fff',
+        ring:t.st==='done'?'#17624A':t.st==='now'?'#E0A22B':'#D3D0C6',
+        rail:t.last?'transparent':(t.st==='done'?'#17624A':'#DEDBD1'),
+        titleColor:t.st==='todo'?'#9A9D94':'#14181A',
+        anim:t.st==='now'?'pulsedot 1.4s infinite':'none'})),
+      quotes:[
+        {name:'Anadolu Rulman A.Ş.',meta:'Teslim 2 gün · 12 ay garanti',price:'₺3.240',tag:'En uygun',border:'#17624A',priceColor:'#17624A',tagColor:'#17624A'},
+        {name:'Teknik Yedek Ltd.',meta:'Teslim 1 gün · 6 ay garanti',price:'₺3.880',tag:'En hızlı',border:'rgba(20,24,26,.09)',priceColor:'#14181A',tagColor:'#8A8D84'},
+        {name:'Mega Endüstri',meta:'Teklif bekleniyor',price:'—',tag:'2 gün gecikme',border:'rgba(20,24,26,.09)',priceColor:'#A8ABA1',tagColor:'#D08A1E'}],
+
+      pending:pend.map(p=>({...p,urgBg:p.urgency==='Kritik'?'#FDF1EF':'#FBF1DC',urgFg:p.urgency==='Kritik'?'#B3392C':'#8A6412',
+        onApprove:()=>this.setState({approved:st.approved.concat(p.code)}),
+        onReject:()=>this.setState({approved:st.approved.concat(p.code)})})),
+      pendingCount:pend.length, hasPending:pend.length>0, allDone:pend.length===0,
+      resetQueue:()=>this.setState({approved:[]}),
+
+      notifs:[
+        {icon:'✓',title:'TLP-2415 için 2. teklif geldi — Teknik Yedek Ltd.',meta:'8 dk önce · Satınalma',icon:'↓',iconBg:'#E7EEF8',iconFg:'#2E5FA3',bg:'#FBFAF7'},
+        {icon:'✓',title:'TLP-2416 vardiya şefi tarafından onaylandı',meta:'1 sa önce · Serkan Demir',iconBg:'#E4F0E9',iconFg:'#17624A',bg:'#FBFAF7'},
+        {icon:'!',title:'RLM-6204-2Z stok seviyesi kritik altında',meta:'3 sa önce · Depo',iconBg:'#FBF1DC',iconFg:'#8A6412',bg:'#fff'},
+        {icon:'✕',title:'TLP-2405 reddedildi: mevcut conta ile devam',meta:'Dün · Serkan Demir',iconBg:'#FDF1EF',iconFg:'#B3392C',bg:'#fff'}],
+
+      tabs:[{label:'Talepler',icon:'▦',k:'home'},{label:'Onaylar',icon:'✓',k:'approve'},{label:'Bildirim',icon:'◔',k:'notif'},{label:'Profil',icon:'◉',k:'profil'}].map(t=>({
+        ...t,color:sc===t.k?'#17624A':'#9A9D94',onPick:()=>this.go(t.k)}))
+    };
+  }
+}
+</script>
+
+
+<div id="__claude_design_branding"><style>#__claude_design_branding{position:fixed;right:16px;bottom:16px;z-index:2147483646;display:flex;align-items:center;gap:7px;height:30px;padding:0 5px 0 10px;border-radius:999px;font-family:"Anthropic Sans",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;font-size:12.5px;font-weight:400;line-height:1;letter-spacing:normal;text-transform:none;color:#141413;background:rgba(255,255,255,.86);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);box-shadow:0 0 0 .5px rgba(31,30,29,.14),0 2px 10px rgba(0,0,0,.09)}
+#__claude_design_branding *{box-sizing:border-box;margin:0}
+#__claude_design_branding a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+#__claude_design_branding a:hover span{text-decoration:underline}
+#__claude_design_branding svg{flex:none}
+#__claude_design_branding a svg{color:#D97757}
+#__claude_design_branding button{width:20px;height:20px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:currentColor;opacity:.55;border:0;background:none;cursor:pointer;flex:none;font:inherit;transition:opacity .14s}
+#__claude_design_branding button:hover{opacity:1;background:rgba(127,127,127,.22)}
+@media print{#__claude_design_branding{display:none}}</style><a href="https://claude.com/product/design" target="_blank" rel="noopener noreferrer"><svg width="14" height="14" viewBox="0 0 20 21" fill="none" aria-hidden="true"><path fill="currentColor" d="M9.99902 0C15.5258 0.000170936 19.999 4.50643 19.999 10.0547C19.999 11.7656 19.5863 12.9976 18.7861 13.8203C17.9924 14.6362 16.9465 14.9138 15.9854 15.0078C15.05 15.0993 14.0097 15.0262 13.2549 15.0186C12.8524 15.0145 12.5177 15.0267 12.2441 15.0703C11.9682 15.1144 11.8143 15.1813 11.7305 15.2432C11.4745 15.4322 11.3353 15.7121 11.2656 16.1602C11.2303 16.3875 11.2168 16.6362 11.209 16.9131C11.2017 17.1715 11.1986 17.4893 11.1807 17.7705C11.1469 18.2975 11.0495 19.0865 10.4199 19.5908C9.7846 20.0996 8.88652 20.1057 7.85449 19.877C7.36399 19.7682 6.88652 19.6232 6.42578 19.4453C2.66989 17.9949 0.000187748 14.3414 0 10.0547C0 4.50643 4.47223 0.000171048 9.99902 0ZM9.99902 1.60547C5.36781 1.60564 1.60547 5.38391 1.60547 10.0547C1.60566 13.6582 3.84823 16.7296 7.00391 17.9482C7.39027 18.0974 7.79085 18.2184 8.20215 18.3096C9.1375 18.5169 9.384 18.3633 9.41602 18.3379C9.4524 18.3087 9.54558 18.1915 9.5791 17.668C9.5947 17.4239 9.59473 17.1786 9.60352 16.8672C9.61179 16.5742 9.62831 16.2435 9.67969 15.9131C9.78359 15.2455 10.0474 14.4906 10.7764 13.9521C11.1479 13.6778 11.5842 13.5493 11.9912 13.4844C12.4007 13.4191 12.8434 13.4088 13.2705 13.4131C14.1753 13.4222 15.0071 13.4905 15.8291 13.4102C16.6257 13.3322 17.2249 13.1235 17.6357 12.7012C18.0401 12.2855 18.3935 11.5261 18.3936 10.0547C18.3936 5.38391 14.6302 1.60564 9.99902 1.60547ZM5.11621 9.86719C5.86386 9.91468 6.45486 10.5348 6.45508 11.2939C6.45506 12.0838 5.81519 12.7245 5.02539 12.7246C4.28481 12.7246 3.67573 12.1617 3.60254 11.4404L3.59473 11.2939L3.60156 11.1533C3.66942 10.4596 4.23282 9.91186 4.93359 9.86719H5.11621ZM14.9814 7.19141C15.729 7.23889 16.3199 7.85919 16.3203 8.61816C16.3203 9.40801 15.6804 10.0487 14.8906 10.0488C14.1501 10.0487 13.5409 9.48586 13.4678 8.76465L13.46 8.61816L13.4668 8.47754C13.5348 7.78403 14.0983 7.23618 14.7988 7.19141H14.9814ZM6.4541 4.93457C7.20161 4.9822 7.79275 5.60231 7.79297 6.36133C7.79288 7.151 7.15291 7.7917 6.36328 7.79199C5.62274 7.79199 5.01369 7.22903 4.94043 6.50781L4.93262 6.36133L4.93945 6.2207C5.00731 5.52698 5.5707 4.97922 6.27148 4.93457H6.4541ZM11.3867 3.59668C12.1343 3.64419 12.7253 4.26436 12.7256 5.02344C12.7256 5.81326 12.0857 6.45393 11.2959 6.4541C10.5553 6.4541 9.94622 5.89123 9.87305 5.16992L9.86523 5.02344L9.87207 4.88281C9.93996 4.18912 10.5033 3.64133 11.2041 3.59668H11.3867Z"></path></svg><span>Made with Claude Design</span></a><button type="button" aria-label="Dismiss" onclick="this.parentElement.remove()"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></button></div></body></html>
