@@ -87,7 +87,7 @@ npm test
 ## Henüz olmayanlar
 
 - Telefona anlık (push) bildirim — bildirimler şimdilik uygulama içindeki *Bildirim* sekmesinde görünür
-- Çevrimdışı taslak — talep açmak için bağlantı gerekir
+- Tam çevrimdışı çalışma — yarım kalan talep cihazda taslak olarak saklanır, ancak göndermek ve listeleri görmek için bağlantı gerekir
 - Depo rolü ve stok kontrol adımı — stok bilgisi Excel'den gelir, talep sırasında gösterilir
 - Teklif dosyası / fotoğraf ekleme, raporlar, ERP entegrasyonu
 - "Şifremi unuttum" e-postası — şifreyi yönetici Yönetim → Kullanıcılar'dan sıfırlar

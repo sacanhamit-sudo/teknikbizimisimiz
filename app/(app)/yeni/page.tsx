@@ -28,6 +28,26 @@ interface Draft {
   price: string;
 }
 
+interface Saved {
+  factoryId: string;
+  lines: Line[];
+  costCenterId: string;
+  equipmentId: string;
+  neededBy: string;
+  urgency: Urgency;
+  note: string;
+}
+
+/** Yarım kalan talep bu cihazda saklanır; bağlantı kesilse ya da sayfa kapansa da kaybolmaz. */
+function readSaved(key: string): Partial<Saved> {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) ?? "null");
+    return v && typeof v === "object" && Array.isArray(v.lines) ? v : {};
+  } catch {
+    return {};
+  }
+}
+
 const STEP_NAMES = ["Malzeme", "Detay", "Özet"];
 const UNITS = ["adet", "takım", "L", "kg", "m"];
 
@@ -38,14 +58,21 @@ function addDays(n: number) {
 }
 
 export default function NewRequestPage() {
-  const { factories } = useAuth();
+  const { factories, profile } = useAuth();
   const router = useRouter();
+  const savedKey = "talep-taslak-" + profile.id;
+  const [saved] = useState(() => readSaved(savedKey));
+  const restored = !!saved.lines?.length;
   const [step, setStep] = useState(0);
-  const [factoryId, setFactoryId] = useState(factories.length === 1 ? factories[0].id : "");
+  const [factoryId, setFactoryId] = useState(
+    saved.factoryId && factories.some((f) => f.id === saved.factoryId)
+      ? saved.factoryId
+      : factories.length === 1 ? factories[0].id : "",
+  );
   const factory = factories.find((f) => f.id === factoryId);
 
   // 1 · Malzeme
-  const [lines, setLines] = useState<Line[]>([]);
+  const [lines, setLines] = useState<Line[]>(saved.lines ?? []);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CatalogItem[] | null>(null);
   const [searchError, setSearchError] = useState("");
@@ -57,11 +84,34 @@ export default function NewRequestPage() {
   // 2 · Detay
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
-  const [costCenterId, setCostCenterId] = useState("");
-  const [equipmentId, setEquipmentId] = useState("");
-  const [neededBy, setNeededBy] = useState(addDays(3));
-  const [urgency, setUrgency] = useState<Urgency>("normal");
-  const [note, setNote] = useState("");
+  const [costCenterId, setCostCenterId] = useState(saved.costCenterId ?? "");
+  const [equipmentId, setEquipmentId] = useState(saved.equipmentId ?? "");
+  const [neededBy, setNeededBy] = useState(
+    saved.neededBy && saved.neededBy >= todayISO() ? saved.neededBy : addDays(3),
+  );
+  const [urgency, setUrgency] = useState<Urgency>(saved.urgency ?? "normal");
+  const [note, setNote] = useState(saved.note ?? "");
+  const [showRestored, setShowRestored] = useState(restored);
+
+  useEffect(() => {
+    try {
+      if (lines.length) {
+        const draft: Saved = { factoryId, lines, costCenterId, equipmentId, neededBy, urgency, note };
+        localStorage.setItem(savedKey, JSON.stringify(draft));
+      } else localStorage.removeItem(savedKey);
+    } catch {}
+  }, [savedKey, factoryId, lines, costCenterId, equipmentId, neededBy, urgency, note]);
+
+  function discard() {
+    setLines([]);
+    setCostCenterId(costCenters.length === 1 ? costCenters[0].id : "");
+    setEquipmentId("");
+    setNeededBy(addDays(3));
+    setUrgency("normal");
+    setNote("");
+    setStep(0);
+    setShowRestored(false);
+  }
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -78,9 +128,11 @@ export default function NewRequestPage() {
       if (stale) return;
       const ccs = (cc.data ?? []) as CostCenter[];
       setCostCenters(ccs);
-      setEquipment((eq.data ?? []) as Equipment[]);
-      setCostCenterId(ccs.length === 1 ? ccs[0].id : "");
-      setEquipmentId("");
+      const eqs = (eq.data ?? []) as Equipment[];
+      setEquipment(eqs);
+      // Taslaktan gelen seçimler bu fabrikada geçerliyse korunur
+      setCostCenterId((cur) => (ccs.some((c) => c.id === cur) ? cur : ccs.length === 1 ? ccs[0].id : ""));
+      setEquipmentId((cur) => (eqs.some((e) => e.id === cur) ? cur : ""));
     })();
     return () => {
       stale = true;
@@ -205,10 +257,13 @@ export default function NewRequestPage() {
       p_lines: lines,
     });
     if (error) {
-      setError(errText(error));
+      setError(errText(error) + " Talebiniz bu cihazda taslak olarak duruyor; bağlantı gelince tekrar gönderebilirsiniz.");
       setBusy(false);
       return;
     }
+    try {
+      localStorage.removeItem(savedKey);
+    } catch {}
     router.replace(`/talep/${data}?yeni=1`);
   }
 
@@ -234,6 +289,13 @@ export default function NewRequestPage() {
           {STEP_NAMES.map((_, i) => <span key={i} className={i <= step ? "on" : ""} />)}
         </div>
       </header>
+
+      {showRestored && (
+        <p className="note-box" role="status">
+          Yarım kalan talebiniz geri yüklendi.{" "}
+          <button className="link-btn danger" onClick={discard}>Taslağı sil</button>
+        </p>
+      )}
 
       {step === 0 && (
         <>

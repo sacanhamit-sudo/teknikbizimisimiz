@@ -305,7 +305,7 @@ begin
   from public.request_lines where request_id = v_id;
 
   v_status := case when v_total > v_factory.request_approval_limit
-                   then 'pending_approval' else 'sourcing' end;
+                   then 'pending_approval' else 'sourcing' end::public.request_status;
   update public.requests set estimated_total = v_total, status = v_status where id = v_id;
 
   perform public._log(v_id, 'created', 'Talep oluşturuldu · tahmini ' || public._money(v_total));
