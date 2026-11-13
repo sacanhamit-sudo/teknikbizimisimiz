@@ -1,7 +1,6 @@
-const moneyFmt = new Intl.NumberFormat("tr-TR", {
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
+const numFmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 3 });
+const wholeFmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
+const centsFmt = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateFmt = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short" });
 const dateTimeFmt = new Intl.DateTimeFormat("tr-TR", {
   day: "numeric",
@@ -10,9 +9,13 @@ const dateTimeFmt = new Intl.DateTimeFormat("tr-TR", {
   minute: "2-digit",
 });
 
-export const money = (n: number | null | undefined) => "₺" + moneyFmt.format(Number(n ?? 0));
+/** Tam tutarlar kuruşsuz (₺3.240), kuruşlu tutarlar iki haneli (₺3.365,50) yazılır. */
+export function money(n: number | null | undefined): string {
+  const v = Math.round(Number(n ?? 0) * 100) / 100;
+  return "₺" + (Number.isInteger(v) ? wholeFmt : centsFmt).format(v);
+}
 
-export const qty = (n: number) => moneyFmt.format(Number(n));
+export const qty = (n: number) => numFmt.format(Number(n));
 
 /** "2026-11-14" gibi tarih alanlarını yerel gün olarak biçimlendirir. */
 export function day(iso: string | null | undefined): string {

@@ -176,6 +176,7 @@ export default function NewRequestPage() {
     ]);
     setDraft(null);
     setQuery("");
+    setError("");
   }
 
   function next() {

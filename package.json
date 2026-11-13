@@ -6,12 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test --test-reporter=spec tests/*.test.mjs",
+    "db:start": "supabase start",
+    "db:reset": "supabase db reset",
+    "postinstall": "node -e \"require('fs').copyFileSync('node_modules/zxing-wasm/dist/reader/zxing_reader.wasm','public/zxing_reader.wasm')\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
-    "@zxing/browser": "^0.2.1",
-    "@zxing/library": "^0.23.0",
+    "barcode-detector": "^3.2.3",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",

@@ -52,15 +52,14 @@ export async function POST(request: Request) {
     password,
     email_confirm: true,
     user_metadata: { full_name: fullName },
-    app_metadata: { role },
   });
   if (error || !data.user) {
     const exists = error?.message.toLowerCase().includes("already");
     return fail(400, exists ? "Bu e-posta ile kayıtlı bir kullanıcı var." : "Kullanıcı oluşturulamadı: " + error?.message);
   }
-  // Profil tetikleyiciyle oluşur; rolü burada da kesinleştir (ilk kullanıcı kuralını ezmek için)
+  // Profil tetikleyiciyle pasif olarak oluşur; rolü ver ve etkinleştir
   const { error: roleError } = await auth.admin
-    .from("profiles").update({ role, full_name: fullName }).eq("id", data.user.id);
+    .from("profiles").update({ role, full_name: fullName, active: true }).eq("id", data.user.id);
   if (roleError) return fail(500, "Kullanıcı oluşturuldu ancak rol atanamadı: " + roleError.message);
   if (factoryIds.length) {
     const { error: memberError } = await auth.admin

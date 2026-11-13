@@ -192,24 +192,21 @@ language sql stable security definer set search_path = '' as $$
   end
 $$;
 
--- Yeni auth kullanıcısı için profil. İlk kullanıcı admin olur (kurulum),
--- sonrakiler admin tarafından atanan rolü metadata'dan alır.
+-- Yeni auth kullanıcısı için profil. İlk kullanıcı admin olur (kurulum).
+-- Sonraki herkes pasif teknisyen olarak başlar; rolü ve aktifliği yönetici
+-- verir (uygulamadaki kullanıcı ekleme bunu tek adımda yapar). Böylece kendi
+-- kendine kayıt olan biri, kayıt açık bırakılmış olsa bile hiçbir veriyi göremez.
 create function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare
-  v_role public.user_role;
+  v_first boolean := not exists (select 1 from public.profiles);
 begin
-  if not exists (select 1 from public.profiles) then
-    v_role := 'admin';
-  else
-    v_role := coalesce(
-      nullif(new.raw_app_meta_data ->> 'role', '')::public.user_role, 'technician');
-  end if;
-  insert into public.profiles (id, email, full_name, role)
+  insert into public.profiles (id, email, full_name, role, active)
   values (
     new.id, coalesce(new.email, ''),
     coalesce(nullif(new.raw_user_meta_data ->> 'full_name', ''), split_part(coalesce(new.email, ''), '@', 1)),
-    v_role);
+    case when v_first then 'admin' else 'technician' end::public.user_role,
+    v_first);
   return new;
 end $$;
 
@@ -246,7 +243,9 @@ $$;
 
 create function public._money(p numeric) returns text
 language sql immutable set search_path = '' as $$
-  select '₺' || replace(to_char(p, 'FM999G999G999G990D00'), ',', '.')
+  -- Türkçe biçim: 3.365,50 — kuruşsuz tutarlarda ",00" atılır
+  select '₺' || regexp_replace(
+    translate(to_char(p, 'FM999,999,999,990.00'), ',.', '.,'), ',00$', '')
 $$;
 
 -- ───────────────────────── İş akışı ─────────────────────────
@@ -624,32 +623,33 @@ alter table public.quotes enable row level security;
 alter table public.request_events enable row level security;
 alter table public.notifications enable row level security;
 
--- Ana veriler: giriş yapan herkes okur, yalnızca admin yazar
-create policy read_all on public.factories for select to authenticated using (true);
+-- Ana veriler: aktif profili olan herkes okur, yalnızca admin yazar.
+-- (my_role() pasif ya da profili olmayan kullanıcı için null döner.)
+create policy read_all on public.factories for select to authenticated using ((select public.my_role()) is not null);
 create policy admin_write on public.factories for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
-create policy read_all on public.cost_centers for select to authenticated using (true);
+create policy read_all on public.cost_centers for select to authenticated using ((select public.my_role()) is not null);
 create policy admin_write on public.cost_centers for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
-create policy read_all on public.equipment for select to authenticated using (true);
+create policy read_all on public.equipment for select to authenticated using ((select public.my_role()) is not null);
 create policy admin_write on public.equipment for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
-create policy read_all on public.catalog_items for select to authenticated using (true);
+create policy read_all on public.catalog_items for select to authenticated using ((select public.my_role()) is not null);
 create policy admin_write on public.catalog_items for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
-create policy read_all on public.stock_levels for select to authenticated using (true);
+create policy read_all on public.stock_levels for select to authenticated using ((select public.my_role()) is not null);
 create policy admin_write on public.stock_levels for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
-create policy read_all on public.profiles for select to authenticated using (true);
+create policy read_all on public.profiles for select to authenticated using ((select public.my_role()) is not null);
 create policy admin_update on public.profiles for update to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
-create policy read_all on public.profile_factories for select to authenticated using (true);
+create policy read_all on public.profile_factories for select to authenticated using ((select public.my_role()) is not null);
 create policy admin_write on public.profile_factories for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 

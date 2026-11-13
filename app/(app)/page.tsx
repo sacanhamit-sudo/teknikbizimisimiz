@@ -65,7 +65,21 @@ export default function RequestsPage() {
   const filters = FILTERS[profile.role];
   const [rows, setRows] = useState<RequestRow[] | null>(null);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState(filters[0].label);
+  // Detaydan listeye dönünce seçili filtre korunur
+  const filterKey = "talep-filtre-" + profile.role;
+  const [filter, setFilterState] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(filterKey);
+      if (saved && filters.some((f) => f.label === saved)) return saved;
+    } catch {}
+    return filters[0].label;
+  });
+  const setFilter = (label: string) => {
+    setFilterState(label);
+    try {
+      sessionStorage.setItem(filterKey, label);
+    } catch {}
+  };
   const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {

@@ -527,7 +527,7 @@ function CatalogTab() {
       value, fontWeight: "bold" as const,
     }));
     const sample = [
-      [{ value: "RLM-6204-2Z" }, { value: "Rulman 6204-2Z (paslanmaz)" }, { value: "adet" }, { value: 810 }, { value: "8690000000017" }, { value: "IST" }, { value: 0 }],
+      [{ value: "RLM-6204-2Z" }, { value: "Rulman 6204-2Z (paslanmaz)" }, { value: "adet" }, { value: 810 }, { value: "8690000000012" }, { value: "IST" }, { value: 0 }],
       [{ value: "BNT-80-PU" }, { value: "Taşıyıcı bant kayışı 80 mm" }, { value: "adet" }, { value: 1240 }, { value: "" }, { value: "IST" }, { value: 12 }],
     ];
     await writeExcelFile([header, ...sample]).toFile("katalog-sablonu.xlsx");

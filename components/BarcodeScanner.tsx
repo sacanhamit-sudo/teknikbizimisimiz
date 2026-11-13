@@ -12,27 +12,53 @@ export function BarcodeScanner({ onCode, onClose }: { onCode: (code: string) => 
   });
 
   useEffect(() => {
-    let stop: (() => void) | undefined;
+    let stream: MediaStream | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
+
     (async () => {
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error("no-camera");
-        const { BrowserMultiFormatReader } = await import("@zxing/browser");
-        const reader = new BrowserMultiFormatReader();
-        const controls = await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: "environment" } } },
-          videoRef.current!,
-          (result) => {
-            if (result && !cancelled) {
-              cancelled = true;
-              controls.stop();
-              onCodeRef.current(result.getText());
-            }
+        const [{ BarcodeDetector, prepareZXingModule }, media] = await Promise.all([
+          import("barcode-detector/ponyfill"),
+          navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false }),
+        ]);
+        stream = media;
+        if (cancelled) return media.getTracks().forEach((t) => t.stop());
+
+        // Okuyucu çekirdeği (wasm) CDN yerine uygulamanın kendi sunucusundan yüklenir
+        prepareZXingModule({
+          overrides: {
+            locateFile: (path: string, prefix: string) =>
+              path.endsWith(".wasm") ? "/zxing_reader.wasm" : prefix + path,
           },
-        );
-        if (cancelled) controls.stop();
-        else stop = () => controls.stop();
+        });
+        const detector = new BarcodeDetector({
+          formats: ["ean_13", "ean_8", "code_128", "code_39", "upc_a", "upc_e", "itf", "qr_code", "data_matrix"],
+        });
+
+        const video = videoRef.current!;
+        video.srcObject = media;
+        await video.play();
+
+        const tick = async () => {
+          if (cancelled) return;
+          try {
+            const found = video.readyState >= 2 ? await detector.detect(video) : [];
+            const code = found.find((f) => f.rawValue)?.rawValue;
+            if (code && !cancelled) {
+              cancelled = true;
+              media.getTracks().forEach((t) => t.stop());
+              return onCodeRef.current(code);
+            }
+          } catch {
+            // Tek karelik okuma hatası: sonraki karede yeniden dene
+          }
+          timer = setTimeout(tick, 200);
+        };
+        tick();
       } catch (e) {
+        if (cancelled) return;
         const name = e instanceof Error ? e.name : "";
         setError(
           name === "NotAllowedError"
@@ -41,9 +67,11 @@ export function BarcodeScanner({ onCode, onClose }: { onCode: (code: string) => 
         );
       }
     })();
+
     return () => {
       cancelled = true;
-      stop?.();
+      clearTimeout(timer);
+      stream?.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
