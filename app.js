@@ -116,13 +116,19 @@ async function onSession(session) {
   try { await loadData(); ui.auth = 'in'; } catch (e) { ui.auth = 'err'; }
   render();
 }
+async function epostaYukle() {
+  const { data } = await sb.rpc('kullanici_epostalari');
+  if (!data) return;
+  ui.epostalar = Object.fromEntries(data.map((x) => [x.id, x.eposta]));
+  if (ui.page && ui.page.type === 'kullanicilar') render();
+}
 async function refresh() {
   if (ui.auth !== 'in' || busy || document.visibilityState !== 'visible') return;
   try { if (await loadData()) render(); } catch (e) { /* bağlantı yoksa sonraki denemede */ }
 }
 
 /* ---------- arayüz durumu ---------- */
-const ui = { auth: 'loading', tab: 'gorev', page: null, f: {}, filt: 'Tümü' };
+const ui = { auth: 'loading', tab: 'gorev', page: null, f: {}, filt: 'Tümü', epostalar: {} };
 const set = (k, v) => { ui.f[k] = v; };
 const fv = (k, d = '') => (ui.f[k] ?? d);
 function open(page, fresh = true) { if (fresh) ui.f = {}; ui.page = page; history.pushState({ p: 1 }, ''); render(); window.scrollTo(0, 0); }
@@ -337,7 +343,7 @@ function vKullanicilar() {
   const rolSec = (k, v) => `<select class="in" data-bind="${k}">${Object.keys(ROLES).map((r) => `<option value="${r}" ${v === r ? 'selected' : ''}>${ROLES[r].ad}</option>`).join('')}</select>`;
   return topBack('Kullanıcılar', 'Kullanıcı yönetimi') + `<main class="nopad">
     ${db.users.map((x) => `<div class="card stack"><div class="user"><span class="av" style="background:${x.aktif ? ROLES[x.role].c : '#B9BBB3'}">${initials(x.ad)}</span>
-        <span style="flex:1"><b>${esc(x.ad)}</b><br><span class="meta">${ROLES[x.role].ad}${x.aktif ? '' : ' · pasif'}${x.gecici ? ' · geçici şifre' : ''}</span></span></div>
+        <span style="flex:1;min-width:0"><b>${esc(x.ad)}</b><br>${ui.epostalar[x.id] ? `<span class="meta" style="word-break:break-all">${esc(ui.epostalar[x.id])}</span><br>` : ''}<span class="meta">${ROLES[x.role].ad}${x.aktif ? '' : ' · pasif'}${x.gecici ? ' · geçici şifre' : ''}</span></span></div>
       ${x.id === db.currentUser ? '' : ui.f.rs === x.id
         ? `<label class="f">Yeni geçici şifre (en az 8 karakter)<input class="in" data-bind="rspw" autocomplete="off" value="${esc(fv('rspw'))}"></label>
            <div class="btns"><button class="btn ghost sm" data-a="rsOff">Vazgeç</button><button class="btn sm" data-a="rsSave" data-id="${x.id}">Şifreyi ata</button></div>`
@@ -570,7 +576,7 @@ const A = {
     try { await loadData(); } catch (e) { /* sonraki tazelemede */ }
     ui.f = {}; render(); toast('Şifreniz değiştirildi');
   },
-  kullanicilar: () => open({ type: 'kullanicilar' }),
+  kullanicilar: () => { open({ type: 'kullanicilar' }); epostaYukle(); },
   rsOn: (d) => { ui.f.rs = d.id; ui.f.rspw = ''; render(); }, rsOff: () => { delete ui.f.rs; render(); },
   rsSave: async (d) => {
     if (fv('rspw').length < 8) return toast('Şifre en az 8 karakter olmalı');
@@ -585,7 +591,7 @@ const A = {
     if (p.ad.length < 3) return toast('Ad soyad yazın');
     if (!/^\S+@\S+\.\S+$/.test(p.email)) return toast('Geçerli bir e-posta yazın');
     if (p.sifre.length < 8) return toast('Geçici şifre en az 8 karakter olmalı');
-    if (await run('kullaniciEkle', p)) { ui.f = {}; render(); toast(p.ad + ' eklendi'); }
+    if (await run('kullaniciEkle', p)) { ui.f = {}; render(); toast(p.ad + ' eklendi'); epostaYukle(); }
   },
   tab: (d) => { ui.tab = d.k; ui.filt = 'Tümü'; ui.f = {}; render(); window.scrollTo(0, 0); refresh(); },
   filt: (d) => { ui.filt = d.k; render(); },
