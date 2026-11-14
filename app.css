@@ -128,3 +128,14 @@ textarea.in{min-height:70px;resize:vertical}
 #toast.on{opacity:1;transform:translateX(-50%)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 body.busy .btn{opacity:.55;pointer-events:none}
+.scanbtn{flex:none;padding:0;width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center}
+.row>.in{flex:1;min-width:0}
+#scan{display:none;position:fixed;inset:0;z-index:15;background:#000}
+#scan.on{display:block}
+#scan video{width:100%;height:100%;object-fit:cover}
+#scan .frame{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);width:min(78vw,360px);height:170px;border:2px solid #fff;border-radius:16px;box-shadow:0 0 0 100vmax rgba(0,0,0,.45);overflow:hidden}
+#scan .frame i{position:absolute;left:8px;right:8px;top:0;height:2px;background:#E86B57;animation:scanline 1.6s ease-in-out infinite alternate}
+@keyframes scanline{to{transform:translateY(166px)}}
+#scan .scanbar{position:absolute;left:0;right:0;bottom:0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:12px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.75))}
+#scan .scanbar>div{flex:1;font-size:14px}#scan .scanbar span{opacity:.75;font-size:12.5px}
+#scan .scanbar .btn{width:auto}

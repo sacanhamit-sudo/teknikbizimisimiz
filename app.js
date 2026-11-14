@@ -97,11 +97,11 @@ async function loadData() {
   return changed;
 }
 /* sunucuda bir işlem çalıştırır; başarılıysa veriyi tazeler ve sonucu döndürür, değilse null */
-async function run(a, p) {
+async function run(a, p, fn = 'islem') {
   if (busy) return null;
   busy = true; document.body.classList.add('busy');
   try {
-    const { data, error } = await sb.functions.invoke('islem', { body: { a, p } });
+    const { data, error } = await sb.functions.invoke(fn, { body: { a, p } });
     if (error || !data) { toast('Bağlantı hatası; tekrar deneyin'); return null; }
     if (data.hata) { toast(data.hata); try { if (await loadData()) render(); } catch (e) { /* yoksay */ } return null; }
     await loadData();
@@ -127,7 +127,7 @@ const set = (k, v) => { ui.f[k] = v; };
 const fv = (k, d = '') => (ui.f[k] ?? d);
 function open(page, fresh = true) { if (fresh) ui.f = {}; ui.page = page; history.pushState({ p: 1 }, ''); render(); window.scrollTo(0, 0); }
 function closePage() { ui.page = null; ui.f = {}; render(); }
-window.addEventListener('popstate', () => { if (ui.page) closePage(); });
+window.addEventListener('popstate', () => { if (skipPop) { skipPop = false; return; } if (scanHist) { scanHist = false; stopScan(); return; } if (ui.page) closePage(); });
 const back = () => history.back();
 let toastT;
 function toast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2600); }
@@ -147,6 +147,56 @@ function tasks() {
   return [{ ad: 'Alım onayı (₺100.000 üzeri)', list: by('gm_onayi') }, { ad: 'Sipariş onayı', list: poOf('gm') }];
 }
 const taskCount = () => tasks().reduce((s, g) => s + g.list.length, 0);
+
+/* ---------- barkod okuma ---------- */
+/* Tarayıcının kendi okuyucusu (BarcodeDetector) varsa o, yoksa ZXing kitaplığı kullanılır. */
+let scan = null, scanHist = false, skipPop = false;
+const scanBtn = (a) => `<button class="btn dark sm scanbtn" data-a="${a}" aria-label="Barkod okut"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M7 8v8M10.5 8v8M14 8v8M17 8v8"/></svg></button>`;
+const findByCode = (code) => { const c = code.toLocaleLowerCase('tr'); return db.items.find((m) => m.sku.toLocaleLowerCase('tr') === c || (m.barkod && m.barkod.toLocaleLowerCase('tr') === c)); };
+const loadZX = () => window.ZXing ? Promise.resolve() : new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'vendor/zxing.min.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+function stopScan() {
+  if (!scan) return;
+  clearTimeout(scan.t);
+  try { if (scan.reader) scan.reader.reset(); } catch (e) { /* yoksay */ }
+  if (scan.stream) scan.stream.getTracks().forEach((t) => t.stop());
+  scan = null;
+  const el = document.getElementById('scan'); el.classList.remove('on'); el.innerHTML = '';
+}
+async function startScan(onCode) {
+  if (scan) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return toast('Bu tarayıcıda kamera kullanılamıyor');
+  const el = document.getElementById('scan');
+  el.innerHTML = `<video playsinline muted autoplay></video><div class="frame"><i></i></div>
+    <div class="scanbar"><div><b>Barkodu çerçeveye getirin</b><br><span>Okunduğunda kendiliğinden kapanır</span></div><button class="btn ghost" data-a="scanOff">Vazgeç</button></div>`;
+  el.classList.add('on');
+  const video = el.querySelector('video'), my = (scan = {});
+  history.pushState({ scan: 1 }, ''); scanHist = true;
+  const close = () => { stopScan(); if (scanHist) { scanHist = false; skipPop = true; history.back(); } };
+  const done = (code) => { if (scan !== my) return; close(); if (navigator.vibrate) navigator.vibrate(60); onCode(String(code).trim()); };
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }, audio: false });
+    if (scan !== my) { stream.getTracks().forEach((t) => t.stop()); return; }
+    my.stream = stream;
+    if ('BarcodeDetector' in window) {
+      video.srcObject = stream; await video.play();
+      const det = new window.BarcodeDetector();
+      const tick = async () => {
+        if (scan !== my) return;
+        try { const r = await det.detect(video); if (r.length) return done(r[0].rawValue); } catch (e) { /* kare hazır değil */ }
+        my.t = setTimeout(tick, 150);
+      };
+      tick();
+    } else {
+      await loadZX();
+      if (scan !== my) return;
+      my.reader = new window.ZXing.BrowserMultiFormatReader();
+      my.reader.decodeFromStream(stream, video, (res) => { if (res) done(res.getText()); });
+    }
+  } catch (e) {
+    if (scan === my) close();
+    toast(e && e.name === 'NotAllowedError' ? 'Kamera izni verilmedi; tarayıcı ayarlarından kameraya izin verin' : 'Kamera açılamadı');
+  }
+}
 
 /* ---------- bileşenler ---------- */
 const badge = (s, map = ST) => `<span class="badge ${map[s].t}">${map[s].ad}</span>`;
@@ -246,14 +296,18 @@ function stockInfo(m) {
 }
 function vStok() {
   const q = fv('q').trim().toLocaleLowerCase('tr');
-  const list = db.items.filter((m) => !q || (m.name + ' ' + m.sku).toLocaleLowerCase('tr').includes(q)).map((m) => ({ m, s: stockInfo(m) })).sort((a, b) => b.s.eksik - a.s.eksik);
+  const list = db.items.filter((m) => !q || (m.name + ' ' + m.sku + ' ' + (m.barkod || '')).toLocaleLowerCase('tr').includes(q)).map((m) => ({ m, s: stockInfo(m) })).sort((a, b) => b.s.eksik - a.s.eksik);
+  const ata = ui.f.ata;
   return top('Stok', 'Malzeme durumu ve ihtiyaç') + `<main>
-    <input class="in" placeholder="Malzeme veya stok kodu ara…" data-bind="q" data-live value="${esc(fv('q'))}">
-    ${list.map(({ m, s }) => `<div class="card"><div class="row"><span class="mono">${m.sku}</span><span class="sp"></span>
+    <div class="row"><input class="in" placeholder="Malzeme veya stok kodu ara…" data-bind="q" data-live value="${esc(fv('q'))}">${scanBtn('scanStok')}</div>
+    ${ata ? `<div class="info amber"><b>${esc(ata)}</b> barkodu hiçbir malzemede tanımlı değil. Tanımlamak için aşağıdan malzemeyi seçin.
+      <button class="btn ghost sm" style="margin-top:8px" data-a="ataOff">Vazgeç</button></div>` : ''}
+    ${list.map(({ m, s }) => `<div class="card"><div class="row"><span class="mono">${m.sku}${m.barkod ? ' · ▮▯▮ ' + esc(m.barkod) : ''}</span><span class="sp"></span>
       <span class="badge ${s.eksik ? 'red' : m.stock < m.min ? 'amber' : 'green'}">${s.eksik ? 'Talep açılmalı' : m.stock < m.min ? 'Tedarik sürüyor' : 'Yeterli'}</span></div>
       <div class="ttl">${esc(m.name)}</div>
       <div class="row meta wrap"><span>Stok <b style="color:var(--ink)">${m.stock} ${m.unit}</b></span><span>· Min ${m.min}</span><span>· Yolda ${s.yolda}</span><span>· Talepte ${s.talepte}</span></div>
       ${s.eksik && me().role === 'teknisyen' ? `<button class="btn sm" style="margin-top:10px" data-a="yeni" data-sku="${m.sku}" data-qty="${m.min - m.stock - s.yolda - s.talepte}">Önerilen talebi aç (${m.min - m.stock - s.yolda - s.talepte} ${m.unit})</button>` : ''}
+      ${ata ? `<button class="btn sm" style="margin-top:10px" data-a="ataSec" data-sku="${m.sku}">Barkodu bu malzemeye tanımla</button>` : ''}
     </div>`).join('') || '<div class="empty">Malzeme bulunamadı</div>'}</main>` + tabs();
 }
 function vBildirim() {
@@ -307,8 +361,8 @@ function vYeni() {
   h += lines.map((l, i) => `<div class="card row"><div style="flex:1;min-width:0"><b style="font-weight:600">${esc(l.name)}</b><br><span class="meta">${l.qty} ${esc(l.unit)} × ${money(l.est)} = ${money(l.qty * l.est)}</span></div>
     <button class="btn danger sm" data-a="delLine" data-i="${i}" aria-label="Kalemi sil">Sil</button></div>`).join('');
   if (!pick) {
-    const cat = db.items.filter((m) => !q || (m.name + ' ' + m.sku).toLocaleLowerCase('tr').includes(q)).slice(0, q ? 12 : 5);
-    h += `<div class="card stack"><input class="in" placeholder="Malzeme adı veya stok kodu ara…" data-bind="mq" data-live value="${esc(fv('mq'))}">
+    const cat = db.items.filter((m) => !q || (m.name + ' ' + m.sku + ' ' + (m.barkod || '')).toLocaleLowerCase('tr').includes(q)).slice(0, q ? 12 : 5);
+    h += `<div class="card stack"><div class="row"><input class="in" placeholder="Malzeme adı veya stok kodu ara…" data-bind="mq" data-live value="${esc(fv('mq'))}">${scanBtn('scanYeni')}</div>
       ${cat.map((m) => `<button class="q" data-a="pickItem" data-sku="${m.sku}"><span style="flex:1"><b style="font-weight:600">${esc(m.name)}</b><br><span class="mono">${m.sku}</span></span>
         <span class="badge ${m.stock ? 'green' : 'red'}">${m.stock ? m.stock + ' ' + m.unit : 'Stok yok'}</span></button>`).join('')}
       <button class="btn ghost sm" data-a="pickItem" data-sku="SERBEST">+ Katalogda yok — serbest tanımla</button></div>`;
@@ -592,6 +646,24 @@ const A = {
     act('receive', { qtys, irsaliye: fv('irs').trim() }, (r) => r.status === 'depoda' ? 'Mal kabul tamamlandı' : 'Kısmi mal kabul kaydedildi');
   },
   handover: () => act('handover', {}, 'Teslim alındı, talep kapandı'),
+  scanOff: () => { if (scanHist) history.back(); else stopScan(); },
+  scanYeni: () => startScan((code) => {
+    const m = findByCode(code);
+    if (m) { A.pickItem({ sku: m.sku }); toast(m.name); }
+    else { ui.f.mq = code; render(); toast('Bu barkod tanımlı değil: ' + code + ' — adıyla arayın veya serbest tanımlayın'); }
+  }),
+  scanStok: () => startScan((code) => {
+    const m = findByCode(code);
+    if (m) { ui.f = { q: m.sku }; render(); toast(m.name); }
+    else if (me().role === 'teknisyen') toast('Bu barkod tanımlı değil: ' + code);
+    else { ui.f = { ata: code }; render(); window.scrollTo(0, 0); }
+  }),
+  ataOff: () => { ui.f = {}; render(); },
+  ataSec: async (d) => {
+    const m = item(d.sku), kod = ui.f.ata;
+    if (m.barkod && !confirm(m.name + ' için tanımlı barkod (' + m.barkod + ') değiştirilsin mi?')) return;
+    if (await run('barkodAta', { sku: d.sku, barkod: kod }, 'malzeme')) { ui.f = { q: d.sku }; render(); toast('Barkod tanımlandı: ' + m.name); }
+  },
 };
 
 document.addEventListener('click', (e) => { const el = e.target.closest('[data-a]'); if (el && A[el.dataset.a]) A[el.dataset.a](el.dataset); });
