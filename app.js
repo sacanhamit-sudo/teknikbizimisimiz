@@ -266,16 +266,24 @@ const vMesaj = (baslik, metin, retry) => `<div class="login"><div class="mono">T
 function vGorev() {
   const g = tasks(), T = db.talepler, r = me().role;
   const mine = r === 'teknisyen' ? T.filter((t) => t.by === db.currentUser) : T;
-  const stats = [[taskCount(), 'Bekleyen işim'], [mine.filter(isOpen).length, r === 'teknisyen' ? 'Açık talebim' : 'Açık talep'],
-    [db.siparisler.filter((p) => p.status === 'tedarikte' || p.status === 'kismi').length, 'Yoldaki sipariş'], [mine.filter(isLate).length, 'Geciken']];
+  const isler = g.flatMap((s) => s.list), acik = mine.filter(isOpen), gec = mine.filter(isLate);
+  const yolda = db.siparisler.filter((p) => p.status === 'tedarikte' || p.status === 'kismi');
+  const stats = [['is', isler.length, 'Bekleyen işim'], ['acik', acik.length, r === 'teknisyen' ? 'Açık talebim' : 'Açık talep'], ['yolda', yolda.length, 'Yoldaki sipariş'], ['geciken', gec.length, 'Geciken']];
   let h = top('Merhaba, ' + esc(me().ad.split(' ')[0]), ROLES[r].ad);
-  h += `<main><div class="stats">${stats.map(([n, ad], i) => `<div class="stat ${i === 3 && n ? 'warn' : ''}"><b>${n}</b><span>${ad}</span></div>`).join('')}</div>`;
-  g.forEach((s) => { h += `<div class="h2">${s.ad} <b>${s.list.length}</b></div>` + (s.list.map(talepCard).join('') || `<div class="card empty" style="padding:14px">Bekleyen iş yok</div>`); });
-  if (r === 'teknisyen') {
-    const acik = mine.filter((t) => isOpen(t) && t.status !== 'depoda');
-    h += `<div class="h2">Devam eden taleplerim <b>${acik.length}</b></div>` + (acik.map(talepCard).join('') || `<div class="card empty">Açık talebiniz yok</div>`);
-    h += `<button class="fab" data-a="yeni">+ Yeni talep</button>`;
+  h += `<main><div class="stats">${stats.map(([k, n, ad]) => `<button class="stat ${k === 'geciken' && n ? 'warn' : ''} ${ui.stat === k ? 'on' : ''}" data-a="stat" data-k="${k}" aria-pressed="${ui.stat === k}"><b>${n}</b><span>${ad}</span></button>`).join('')}</div>`;
+  const liste = (ad, kartlar, bos) => `<div class="h2">${ad} <b>${kartlar.length}</b><span class="sp"></span><button class="link" data-a="stat" data-k="${ui.stat}">Kapat ✕</button></div>` + (kartlar.join('') || `<div class="card empty">${bos}</div>`);
+  if (ui.stat === 'is') h += liste('Bekleyen işlerim', isler.map(talepCard), 'Bekleyen işiniz yok');
+  else if (ui.stat === 'acik') h += liste(r === 'teknisyen' ? 'Açık taleplerim' : 'Açık talepler', acik.map(talepCard), 'Açık talep yok');
+  else if (ui.stat === 'yolda') h += liste('Yoldaki siparişler', yolda.map(poCard), 'Yolda sipariş yok');
+  else if (ui.stat === 'geciken') h += liste(r === 'teknisyen' ? 'Geciken taleplerim' : 'Geciken talepler', gec.map(talepCard), 'Geciken talep yok');
+  else {
+    g.forEach((s) => { h += `<div class="h2">${s.ad} <b>${s.list.length}</b></div>` + (s.list.map(talepCard).join('') || `<div class="card empty" style="padding:14px">Bekleyen iş yok</div>`); });
+    if (r === 'teknisyen') {
+      const devam = acik.filter((t) => t.status !== 'depoda');
+      h += `<div class="h2">Devam eden taleplerim <b>${devam.length}</b></div>` + (devam.map(talepCard).join('') || `<div class="card empty">Açık talebiniz yok</div>`);
+    }
   }
+  if (r === 'teknisyen') h += `<button class="fab" data-a="yeni">+ Yeni talep</button>`;
   return h + '</main>' + tabs();
 }
 function vTalepler() {
@@ -568,7 +576,7 @@ const A = {
     const { error } = await sb.auth.signInWithPassword({ email, password });
     busy = false;
     if (error) toast(/invalid/i.test(error.message) ? 'E-posta veya şifre hatalı' : 'Giriş yapılamadı; bağlantınızı kontrol edin');
-    else { ui.f = {}; ui.tab = 'gorev'; }
+    else { ui.f = {}; ui.tab = 'gorev'; ui.stat = null; }
   },
   logout: async () => { ui.recovery = false; await sb.auth.signOut(); },
   unutOn: () => { ui.f = { unut: true, email: fv('email') }; render(); }, unutOff: () => { ui.f = { email: fv('email') }; render(); },
@@ -608,7 +616,8 @@ const A = {
     if (p.sifre.length < 8) return toast('Geçici şifre en az 8 karakter olmalı');
     if (await run('kullaniciEkle', p)) { ui.f = {}; render(); toast(p.ad + ' eklendi'); epostaYukle(); }
   },
-  tab: (d) => { ui.tab = d.k; ui.filt = 'Tümü'; ui.f = {}; render(); window.scrollTo(0, 0); refresh(); },
+  stat: (d) => { ui.stat = ui.stat === d.k ? null : d.k; render(); },
+  tab: (d) => { ui.tab = d.k; ui.filt = 'Tümü'; ui.stat = null; ui.f = {}; render(); window.scrollTo(0, 0); refresh(); },
   filt: (d) => { ui.filt = d.k; render(); },
   back, profil: () => open({ type: 'profil' }),
   openTalep: (d) => open({ type: 'talep', id: d.id }), openPO: (d) => open({ type: 'po', id: d.id }),

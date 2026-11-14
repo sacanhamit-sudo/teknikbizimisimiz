@@ -139,3 +139,8 @@ body.busy .btn{opacity:.55;pointer-events:none}
 #scan .scanbar{position:absolute;left:0;right:0;bottom:0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:12px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.75))}
 #scan .scanbar>div{flex:1;font-size:14px}#scan .scanbar span{opacity:.75;font-size:12.5px}
 #scan .scanbar .btn{width:auto}
+button.stat{font:inherit;color:inherit;cursor:pointer}
+.stat.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset}
+.stat:active{background:#FBFAF7}
+.h2 .sp{flex:1}
+.link{border:0;background:none;font:inherit;font-size:10.5px;letter-spacing:.06em;color:var(--acc);font-weight:600;padding:4px 0;cursor:pointer}
