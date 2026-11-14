@@ -1,10 +1,12 @@
 /* Teknik Satınalma — talep → onay → teklif → değerlendirme onayı → sipariş → sipariş onayı → mal kabul → teslim
-   Veriler bu cihazın tarayıcısında (localStorage) tutulur; sunucu yoktur. */
+   Veriler ortak Supabase veritabanındadır. Bu dosya yalnızca okur ve gösterir; tüm yazma işlemleri
+   kimlik, rol ve durum kontrolü yapan sunucu işlevinden (supabase/functions/islem) geçer. */
 'use strict';
 (() => {
 
-const KEY = 'tbi-satinalma-v1';
-const LIM_TALEP = 1500;      // bu tutarın üstündeki talepler Fabrika Müdürü talep onayına gider
+const SB_URL = 'https://pzclkevawmiqmqixudnt.supabase.co';
+const SB_KEY = 'sb_publishable_xU20CMCioALUunSwRPrlEg__Rf0ioTz'; // herkese açık istemci anahtarı
+const LIM_TALEP = 1500;      // (gösterim için; kural sunucuda) bu tutarın üstündeki talepler Fabrika Müdürü talep onayına gider
 const LIM_GM = 100000;       // bu tutarın üstündeki alımlar Genel Müdür onayına yükselir
 const KDV = 0.20;
 
@@ -41,7 +43,6 @@ const BIRIMLER = ['adet', 'takım', 'L', 'kg', 'm', 'tüp'];
 /* ---------- yardımcılar ---------- */
 let _now = null;
 const now = () => _now || new Date().toISOString();
-const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = (n) => '₺' + (Number(n) || 0).toLocaleString('tr-TR', { maximumFractionDigits: 2 });
 const num = (s) => {
@@ -60,13 +61,13 @@ const today = () => dayISO(new Date());
 const initials = (ad) => ad.split(' ').map((x) => x[0]).join('').slice(0, 2);
 
 /* ---------- veri ---------- */
-let db;
+const sb = window.supabase.createClient(SB_URL, SB_KEY);
+const db = { users: [], items: [], talepler: [], siparisler: [], bildirimler: [], currentUser: null };
 const user = (id) => db.users.find((u) => u.id === id) || { ad: 'Sistem', role: '' };
 const me = () => user(db.currentUser);
 const talep = (id) => db.talepler.find((t) => t.id === id);
 const po = (id) => db.siparisler.find((p) => p.id === id);
 const item = (sku) => db.items.find((m) => m.sku === sku);
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* depolama kapalı olabilir */ } };
 
 const estTotal = (t) => t.lines.reduce((s, l) => s + l.qty * l.est, 0);
 const qTotal = (t, q) => t.lines.reduce((s, l, i) => s + l.qty * (q.prices[i] || 0), 0);
@@ -76,239 +77,52 @@ const tTitle = (t) => t.lines[0].name + (t.lines.length > 1 ? ' +' + (t.lines.le
 const isOpen = (t) => ST[t.status].i > 0 && t.status !== 'teslim';
 const isLate = (t) => isOpen(t) && t.need < today();
 
-function log(t, text) { t.log.unshift({ at: now(), by: db.currentUser, text }); }
-function stamp(t, i, text) { t.stamps[i] = dStr(now()) + ' · ' + text; }
-function notify(to, text, talepId) {
-  if (to === db.currentUser) return;
-  db.bildirimler.unshift({ id: uid(), at: now(), to, text, talepId, read: [] });
-}
-
-/* ---------- iş akışı ---------- */
-function createTalep(d) {
-  const t = {
-    id: uid(), no: 'TLP-' + db.seq.tlp++, by: db.currentUser, at: now(),
-    machine: d.machine, urgency: d.urgency, need: d.need, note: d.note || '',
-    lines: d.lines, quotes: [], pick: null, pickNote: '', poId: null, log: [], stamps: {}, gm: false, direct: false,
+/* ---------- sunucu ---------- */
+let snap = '', busy = false;
+async function loadData() {
+  const r = await Promise.all([
+    sb.from('profiller').select('id, ad, rol, aktif, gecici_sifre').order('ad'),
+    sb.from('malzemeler').select('*').order('name'),
+    sb.from('talepler').select('veri').order('created_at', { ascending: false }),
+    sb.from('siparisler').select('veri').order('created_at', { ascending: false }),
+    sb.from('bildirimler').select('*').order('at', { ascending: false }).limit(100)]);
+  const bad = r.find((x) => x.error); if (bad) throw bad.error;
+  const next = {
+    users: r[0].data.map((x) => ({ id: x.id, ad: x.ad, role: x.rol, aktif: x.aktif, gecici: x.gecici_sifre })),
+    items: r[1].data, talepler: r[2].data.map((x) => x.veri), siparisler: r[3].data.map((x) => x.veri),
+    bildirimler: r[4].data.map((n) => ({ id: n.id, at: n.at, to: n.alici, text: n.metin, talepId: n.talep_id, read: n.okuyan })),
   };
-  const tot = estTotal(t);
-  stamp(t, 0, me().ad);
-  log(t, 'Talep oluşturuldu · tahmini ' + money(tot));
-  if (tot > LIM_TALEP) {
-    t.status = 'talep_onayi';
-    notify('role:mudur', t.no + ' talep onayınızı bekliyor (' + money(tot) + ')', t.id);
-  } else {
-    t.status = 'teklif'; t.direct = true;
-    stamp(t, 1, 'Gerekmedi (limit altı)');
-    log(t, 'Limit altı — onaysız satınalmaya düştü');
-    notify('role:satinalma', t.no + ' satınalma masasına düştü', t.id);
-  }
-  db.talepler.unshift(t);
-  return t;
+  const j = JSON.stringify(next), changed = j !== snap;
+  snap = j; Object.assign(db, next);
+  return changed;
 }
-function decideTalep(t, ok, note) {
-  if (ok) {
-    t.status = 'teklif'; stamp(t, 1, me().ad + ' onayladı');
-    log(t, 'Talep onaylandı' + (note ? ': ' + note : ''));
-    notify(t.by, t.no + ' talebiniz onaylandı, teklif toplanıyor', t.id);
-    notify('role:satinalma', t.no + ' satınalma masasına düştü', t.id);
-  } else stop(t, 1, 'reddedildi', 'Talep reddedildi', note);
+/* sunucuda bir işlem çalıştırır; başarılıysa veriyi tazeler ve sonucu döndürür, değilse null */
+async function run(a, p) {
+  if (busy) return null;
+  busy = true; document.body.classList.add('busy');
+  try {
+    const { data, error } = await sb.functions.invoke('islem', { body: { a, p } });
+    if (error || !data) { toast('Bağlantı hatası; tekrar deneyin'); return null; }
+    if (data.hata) { toast(data.hata); try { if (await loadData()) render(); } catch (e) { /* yoksay */ } return null; }
+    await loadData();
+    return data;
+  } catch (e) { toast('Bağlantı hatası; tekrar deneyin'); return null; }
+  finally { busy = false; document.body.classList.remove('busy'); }
 }
-function stop(t, i, status, text, note) {
-  t.stopAt = i; t.status = status; stamp(t, i, me().ad + (status === 'iptal' ? ' iptal etti' : ' reddetti'));
-  log(t, text + (note ? ': ' + note : ''));
-  notify(t.by, t.no + ' — ' + text.toLowerCase() + (note ? ': ' + note : ''), t.id);
-  if (i > 1) notify('role:satinalma', t.no + ' — ' + text.toLowerCase(), t.id);
+async function onSession(session) {
+  if (!session) { db.currentUser = null; snap = ''; ui.auth = 'out'; ui.page = null; ui.f = {}; render(); return; }
+  if (db.currentUser === session.user.id && ui.auth === 'in') return;
+  db.currentUser = session.user.id;
+  try { await loadData(); ui.auth = 'in'; } catch (e) { ui.auth = 'err'; }
+  render();
 }
-function addQuote(t, q) {
-  const o = { id: uid(), at: now(), by: db.currentUser, ...q };
-  t.quotes.push(o);
-  if (!t.pick) t.pick = o.id;
-  log(t, 'Teklif eklendi: ' + q.supplier + ' · ' + money(qTotal(t, o)));
-}
-function delQuote(t, id) {
-  const q = t.quotes.find((x) => x.id === id);
-  t.quotes = t.quotes.filter((x) => x.id !== id);
-  if (t.pick === id) t.pick = t.quotes[0] ? t.quotes[0].id : null;
-  log(t, 'Teklif silindi: ' + q.supplier);
-}
-function sendQuotes(t, note) {
-  const q = picked(t);
-  t.pickNote = note || ''; t.status = 'teklif_onayi';
-  stamp(t, 2, t.quotes.length + ' teklif · öneri ' + q.supplier);
-  log(t, 'Teklifler değerlendirme onayına gönderildi · öneri: ' + q.supplier + ' ' + money(qTotal(t, q)));
-  notify('role:mudur', t.no + ' teklif değerlendirme onayınızı bekliyor (' + money(qTotal(t, q)) + ')', t.id);
-}
-function decideQuote(t, dec, note) {
-  const isGm = t.status === 'gm_onayi', i = isGm ? 4 : 3, tot = tTotal(t);
-  if (dec === 'ok') {
-    if (!isGm && tot > LIM_GM) {
-      t.status = 'gm_onayi'; t.gm = true; stamp(t, 3, me().ad + ' uygun gördü');
-      log(t, 'Uygun görüş verildi; ' + money(LIM_GM) + ' üzeri — Genel Müdür onayına yükseltildi' + (note ? ': ' + note : ''));
-      notify('role:gm', t.no + ' alım onayınızı bekliyor (' + money(tot) + ')', t.id);
-    } else {
-      t.status = 'siparis_bekliyor'; stamp(t, i, me().ad + ' onayladı');
-      log(t, 'Teklif onaylandı: ' + picked(t).supplier + (note ? ' — ' + note : ''));
-      notify('role:satinalma', t.no + ' teklifi onaylandı, sipariş açabilirsiniz', t.id);
-      notify(t.by, t.no + ' için tedarikçi onaylandı', t.id);
-    }
-  } else if (dec === 'rev') {
-    t.status = 'teklif'; delete t.stamps[2]; delete t.stamps[3];
-    log(t, 'Revizyon istendi' + (note ? ': ' + note : ''));
-    notify('role:satinalma', t.no + ' için revizyon / ek teklif istendi' + (note ? ': ' + note : ''), t.id);
-  } else stop(t, i, 'reddedildi', 'Alım reddedildi', note);
-}
-function createPO(t, d) {
-  const q = picked(t);
-  const lines = t.lines.map((l, i) => ({ sku: l.sku, name: l.name, qty: l.qty, unit: l.unit, price: q.prices[i] || 0, received: 0 }));
-  const subtotal = qTotal(t, q);
-  const p = {
-    id: uid(), no: 'SAS-' + new Date(now()).getFullYear() + '-' + String(db.seq.sas++).padStart(4, '0'),
-    talepId: t.id, supplier: q.supplier, lines, subtotal, kdv: subtotal * KDV, total: subtotal * (1 + KDV),
-    eta: d.eta, term: d.term || q.term || '', place: d.place || '', note: d.note || '',
-    status: 'onay_bekliyor', approver: subtotal > LIM_GM ? 'gm' : 'mudur', at: now(), by: db.currentUser, receipts: [],
-  };
-  db.siparisler.unshift(p);
-  t.poId = p.id; t.status = 'siparis_onayi';
-  stamp(t, 5, p.no + ' · ' + q.supplier);
-  log(t, 'Sipariş oluşturuldu: ' + p.no + ' · ' + money(p.total) + ' (KDV dahil)');
-  notify('role:' + p.approver, p.no + ' sipariş onayınızı bekliyor (' + money(p.total) + ')', t.id);
-  return p;
-}
-function decidePO(t, ok, note) {
-  const p = po(t.poId);
-  if (ok) {
-    p.status = 'tedarikte'; t.status = 'tedarikte'; stamp(t, 6, me().ad + ' onayladı');
-    log(t, p.no + ' siparişi onaylandı, tedarikçiye iletildi' + (note ? ' — ' + note : ''));
-    notify('role:satinalma', p.no + ' onaylandı, tedarikçiye iletebilirsiniz', t.id);
-    notify(t.by, t.no + ' siparişi verildi · tahmini teslim ' + dStr(p.eta), t.id);
-  } else {
-    p.status = 'reddedildi'; t.poId = null; t.status = 'siparis_bekliyor'; delete t.stamps[5];
-    log(t, p.no + ' siparişi reddedildi' + (note ? ': ' + note : ''));
-    notify('role:satinalma', p.no + ' reddedildi, siparişi yeniden düzenleyin' + (note ? ': ' + note : ''), t.id);
-  }
-}
-function receive(t, qtys, irsaliye) {
-  const p = po(t.poId), items = [];
-  p.lines.forEach((l, i) => {
-    const q = Math.min(Math.max(qtys[i] || 0, 0), l.qty - l.received);
-    if (!q) return;
-    l.received += q; items.push({ i, qty: q });
-    const m = item(l.sku); if (m) { m.stock += q; m.last = l.price; }
-  });
-  p.receipts.unshift({ at: now(), by: db.currentUser, irsaliye: irsaliye || '', items });
-  const full = p.lines.every((l) => l.received >= l.qty);
-  p.status = full ? 'teslim' : 'kismi'; t.status = full ? 'depoda' : 'kismi';
-  const txt = items.map((x) => p.lines[x.i].name + ' ' + x.qty + ' ' + p.lines[x.i].unit).join(', ');
-  log(t, (full ? 'Mal kabul tamamlandı' : 'Kısmi mal kabul') + (irsaliye ? ' · irsaliye ' + irsaliye : '') + ' · ' + txt);
-  if (full) { stamp(t, 7, 'Depoya girdi'); notify(t.by, t.no + ' malzemeniz depoda, teslim alabilirsiniz', t.id); }
-  else notify(t.by, t.no + ' için kısmi teslimat depoya girdi', t.id);
-}
-function handover(t) {
-  t.lines.forEach((l) => { const m = item(l.sku); if (m) m.stock = Math.max(0, m.stock - l.qty); });
-  t.status = 'teslim'; stamp(t, 8, me().ad + ' teslim aldı');
-  log(t, 'Malzeme depodan teslim alındı, talep kapandı');
-  notify('role:satinalma', t.no + ' teslim alındı ve kapandı', t.id);
-}
-
-/* ---------- örnek veri ---------- */
-function seed() {
-  db = {
-    v: 1, seq: { tlp: 2405, sas: 414 }, currentUser: null, talepler: [], siparisler: [], bildirimler: [],
-    users: [
-      { id: 'okan', ad: 'Okan Yalçın', role: 'teknisyen' }, { id: 'meral', ad: 'Meral Koç', role: 'teknisyen' },
-      { id: 'ayse', ad: 'Ayşe Tuna', role: 'satinalma' }, { id: 'levent', ad: 'Levent Arslan', role: 'mudur' },
-      { id: 'kemal', ad: 'Kemal Demir', role: 'gm' },
-    ],
-    items: [
-      ['RLM-6204-2Z', 'Rulman 6204-2Z (paslanmaz)', 'adet', 0, 4, 810], ['BNT-80-PU', 'Taşıyıcı bant kayışı 80 mm', 'adet', 2, 2, 1240],
-      ['YTK-UCP204', 'Rulman yatağı UCP 204', 'adet', 3, 2, 460], ['GRS-H1-400G', 'Gıda sınıfı gres NSF H1 400 g', 'tüp', 2, 6, 185],
-      ['SNS-PT100-3M', 'Sıcaklık sensörü PT100 3 m', 'adet', 1, 2, 1450], ['YAG-H1-5L', 'Zincir yağlayıcı NSF H1', 'L', 2, 5, 310],
-      ['REZ-220-450W', 'Çene ısıtıcı rezistans 220V 450W', 'adet', 2, 4, 540], ['CNT-EPDM-80', 'Hijyenik conta EPDM DN80', 'adet', 14, 10, 95],
-      ['SLM-CIP-40', 'CIP pompası salmastra takımı', 'takım', 0, 1, 3950], ['VKM-PED-80', 'Vakum pedi 80 mm (gıda uyumlu)', 'adet', 5, 8, 150],
-      ['VNA-DN65-SS', 'Hijyenik kelebek vana DN65', 'adet', 1, 1, 9500], ['NZL-12-SS', 'Dolum nozulu 12 mm (paslanmaz)', 'adet', 2, 6, 920],
-    ].map(([sku, name, unit, stock, min, last]) => ({ sku, name, unit, stock, min, last })),
-  };
-  const as = (u, daysAgo, h, m) => { db.currentUser = u; const d = new Date(); d.setDate(d.getDate() - daysAgo); d.setHours(h, m || 0, 0, 0); _now = d.toISOString(); };
-  const L = (sku, qty, est, name, unit) => { const it = item(sku); return { sku: it ? sku : 'SERBEST', name: name || it.name, qty, unit: unit || it.unit, est: est ?? it.last }; };
-  const T = (u, d, h, machine, urgency, needIn, note, lines) => { as(u, d, h, 12); return createTalep({ machine, urgency, need: addDays(needIn), note, lines }); };
-  const Q = (t, d, supplier, prices, lead, term, note) => { as('ayse', d, 11, 20); addQuote(t, { supplier, prices, lead, term, note }); };
-  const send = (t, d, pick, note) => { as('ayse', d, 15); t.pick = t.quotes[pick].id; sendQuotes(t, note); };
-  let t;
-
-  t = T('okan', 14, 8, 'Paketleme 3', 'Yüksek', 6, 'Çene sıcaklığı düşüyor, yapışma hatası artıyor.', [L('REZ-220-450W', 6)]);
-  as('levent', 14, 9); decideTalep(t, true, 'Planlı duruşta değişsin');
-  Q(t, 13, 'Isı Teknik A.Ş.', [520], 3, '30 gün', '12 ay garanti'); Q(t, 13, 'Rezistans Dünyası', [565], 2, 'Peşin', '');
-  send(t, 13, 0, 'Fiyat ve garanti avantajlı.'); as('levent', 12, 9); decideQuote(t, 'ok', 'Bütçe içinde');
-  as('ayse', 12, 10); createPO(t, { eta: addDays(3), term: '30 gün', place: 'Bakım deposu' });
-  as('levent', 12, 14); decidePO(t, true); as('ayse', 9, 10); receive(t, [6], 'IRS-44021'); as('okan', 9, 13); handover(t);
-
-  t = T('meral', 10, 7, 'CIP Hattı', 'Normal', 10, 'Yedek conta stoğu azalıyor.', [L('CNT-EPDM-80', 20)]);
-  as('levent', 10, 9); decideTalep(t, false, 'Stokta 14 adet var, mevcut conta ile devam');
-
-  t = T('okan', 8, 8, 'Paketleme 3', 'Normal', 12, 'Zincir yağlama periyodu için.', [L('YAG-H1-5L', 5)]);
-  as('levent', 8, 10); decideTalep(t, true);
-  Q(t, 7, 'Lubrikant Kimya', [298], 4, '30 gün', 'NSF H1 sertifikalı'); Q(t, 7, 'Endüstri Yağ Ltd.', [325], 2, '15 gün', '');
-  send(t, 7, 0, 'En uygun fiyat.'); as('levent', 6, 9); decideQuote(t, 'ok');
-  as('ayse', 6, 11); createPO(t, { eta: addDays(8), term: '30 gün', place: 'Bakım deposu' }); as('levent', 6, 15); decidePO(t, true);
-
-  t = T('meral', 7, 9, 'Genel / Atölye', 'Normal', 9, 'Aylık yağlama sarfı.', [L('GRS-H1-400G', 12)]);
-  as('levent', 7, 10); decideTalep(t, true);
-  Q(t, 6, 'Lubrikant Kimya', [179], 3, '30 gün', ''); Q(t, 6, 'Teknik Yedek Ltd.', [192], 1, 'Peşin', '');
-  send(t, 6, 0, ''); as('levent', 5, 9); decideQuote(t, 'ok');
-  as('ayse', 5, 10); createPO(t, { eta: addDays(6), term: '30 gün', place: 'Bakım deposu' }); as('levent', 5, 13); decidePO(t, true);
-  as('ayse', 2, 10); receive(t, [6], 'IRS-45102');
-
-  t = T('meral', 6, 8, 'Dolum Hattı 1', 'Yüksek', 7, 'Bant kayışında yıpranma var.', [L('BNT-80-PU', 2)]);
-  as('levent', 6, 9); decideTalep(t, true);
-  Q(t, 5, 'Anadolu Rulman A.Ş.', [1210], 2, '30 gün', ''); Q(t, 5, 'Bant Sistemleri Ltd.', [1290], 1, '15 gün', '');
-  send(t, 5, 0, ''); as('levent', 4, 9); decideQuote(t, 'ok');
-  as('ayse', 4, 10); createPO(t, { eta: addDays(4), term: '30 gün', place: 'Bakım deposu' }); as('levent', 4, 12); decidePO(t, true);
-  as('ayse', 1, 11); receive(t, [2], 'IRS-45377');
-
-  t = T('okan', 5, 17, 'Dolum Hattı 2', 'Kritik', 12, 'Servo arızası tekrarlıyor; revizyon yerine set değişimi öneriliyor.',
-    [L('X', 1, 120000, 'Dolum makinesi servo motor ve sürücü seti', 'takım')]);
-  as('levent', 4, 8); decideTalep(t, true, 'Duruş riski yüksek');
-  Q(t, 3, 'Endüstri Otomasyon A.Ş.', [128400], 6, '45 gün', 'Orijinal · 24 ay garanti');
-  Q(t, 3, 'Motor Sistemleri Ltd.', [109700], 4, '30 gün', 'Muadil · 12 ay garanti');
-  Q(t, 3, 'Global Drive', [131900], 21, '60 gün', 'Orijinal · 24 ay garanti');
-  send(t, 2, 0, 'Orijinal parça ve 24 ay garanti; 3 yıllık toplam maliyet daha düşük.');
-  as('levent', 1, 17, 20); decideQuote(t, 'ok', 'Orijinal set ile devam edilmesi uygun');
-
-  t = T('meral', 4, 6, 'Dolum Hattı 1', 'Yüksek', 7, 'Nozullarda damlama var, dolum tartı sapması %1,8.',
-    [L('NZL-12-SS', 6), L('X', 2, 665, 'O-ring takımı FDA silikon', 'takım')]);
-  as('levent', 4, 9); decideTalep(t, true);
-  Q(t, 3, 'Dolum Teknik A.Ş.', [905, 640], 4, '30 gün', ''); Q(t, 3, 'Paslanmaz Market', [960, 610], 2, 'Peşin', '');
-  send(t, 2, 0, 'Toplamda en uygun.'); as('levent', 1, 10); decideQuote(t, 'ok');
-
-  t = T('okan', 4, 10, 'Dolum Hattı 1', 'Kritik', 5, 'Vana sızdırıyor, hijyen riski.', [L('VNA-DN65-SS', 3)]);
-  as('levent', 4, 11); decideTalep(t, true);
-  Q(t, 3, 'Vana Teknik A.Ş.', [9500], 3, '30 gün', 'Stoktan'); Q(t, 3, 'Hijyenik Akış Ltd.', [9150], 9, '30 gün', '');
-  Q(t, 2, 'Proses Armatür', [10200], 2, 'Peşin', '');
-  send(t, 2, 0, 'Stoktan teslim; hat duruş riskini en hızlı kapatıyor.'); as('levent', 1, 9); decideQuote(t, 'ok', 'Aciliyet nedeniyle onaylandı');
-  as('ayse', 0, 8, 30); createPO(t, { eta: addDays(3), term: '30 gün', place: 'Bakım deposu', note: 'Acil sevk' });
-
-  t = T('okan', 3, 8, 'Pastörizatör 1', 'Yüksek', 6, 'Sensör sapması ±2°C, kalibrasyon tutmuyor.', [L('SNS-PT100-3M', 2)]);
-  as('levent', 3, 9); decideTalep(t, true);
-  Q(t, 2, 'Ölçüm Kontrol A.Ş.', [1420], 3, '30 gün', 'Kalibrasyon sertifikalı'); Q(t, 2, 'Sensör Market', [1290], 7, 'Peşin', '');
-  Q(t, 1, 'Teknik Yedek Ltd.', [1510], 1, '15 gün', '');
-  send(t, 1, 0, 'Sertifikalı ürün; teslim süresi uygun.');
-
-  t = T('okan', 2, 7, 'Dolum Hattı 2', 'Kritik', 1, 'Taşıyıcı bant rulmanı ses yapıyor, hat duruşu riski.', [L('RLM-6204-2Z', 4)]);
-  as('levent', 2, 8); decideTalep(t, true, 'Acil');
-  Q(t, 1, 'Anadolu Rulman A.Ş.', [810], 2, '30 gün', '12 ay garanti'); Q(t, 1, 'Teknik Yedek Ltd.', [970], 1, 'Peşin', '6 ay garanti');
-
-  t = T('meral', 0, 6, 'CIP Hattı', 'Yüksek', 8, 'Planlı bakımda salmastra değişecek.', [L('SLM-CIP-40', 2)]);
-  t = T('okan', 0, 9, 'Paketleme 3', 'Normal', 13, 'Paletleyici pedleri sertleşmiş.', [L('VKM-PED-80', 8)]);
-
-  _now = null; db.currentUser = null;
-}
-function load() {
-  try { db = JSON.parse(localStorage.getItem(KEY)); } catch (e) { db = null; }
-  if (!db || db.v !== 1) { seed(); save(); }
+async function refresh() {
+  if (ui.auth !== 'in' || busy || document.visibilityState !== 'visible') return;
+  try { if (await loadData()) render(); } catch (e) { /* bağlantı yoksa sonraki denemede */ }
 }
 
 /* ---------- arayüz durumu ---------- */
-const ui = { tab: 'gorev', page: null, f: {}, filt: 'Tümü', seg: null };
+const ui = { auth: 'loading', tab: 'gorev', page: null, f: {}, filt: 'Tümü' };
 const set = (k, v) => { ui.f[k] = v; };
 const fv = (k, d = '') => (ui.f[k] ?? d);
 function open(page, fresh = true) { if (fresh) ui.f = {}; ui.page = page; history.pushState({ p: 1 }, ''); render(); window.scrollTo(0, 0); }
@@ -374,11 +188,21 @@ const topBack = (title, sub) => `<header class="top"><button class="back" data-a
 
 /* ---------- ekranlar ---------- */
 function vLogin() {
-  return `<div class="login"><div class="mono">TEKNİK SATINALMA · DEMO</div><h1>Kim olarak giriş yapıyorsunuz?</h1>
-    <p class="meta" style="margin:0 0 6px">Şifre yok; rolü seçin, o kişinin ekranını görün. Her rol akışın kendi adımını yürütür.</p>
-    ${db.users.map((u) => `<button class="card tap user" data-a="login" data-id="${u.id}"><span class="av" style="background:${ROLES[u.role].c}">${initials(u.ad)}</span>
-      <span><b>${esc(u.ad)}</b><br><span class="meta">${ROLES[u.role].ad}</span></span></button>`).join('')}</div>`;
+  return `<div class="login"><div class="mono">TEKNİK SATINALMA</div><h1>Giriş yapın</h1>
+    <label class="f">E-posta<input class="in" type="email" autocomplete="username" inputmode="email" data-bind="email" value="${esc(fv('email'))}"></label>
+    <label class="f">Şifre<input class="in" type="password" autocomplete="current-password" data-bind="pw" value="${esc(fv('pw'))}"></label>
+    <button class="btn dark" data-a="login">Giriş yap</button>
+    <p class="meta">Hesabınız yoksa veya şifrenizi unuttuysanız Fabrika Müdürü ya da Genel Müdür hesabından yeni şifre atanabilir.</p></div>`;
 }
+function vSifre() {
+  return `<div class="login"><div class="mono">TEKNİK SATINALMA</div><h1>Yeni şifrenizi belirleyin</h1>
+    <p class="meta" style="margin:0">Size verilen geçici şifreyle giriş yaptınız. Devam etmek için kendi şifrenizi belirleyin (en az 8 karakter).</p>
+    <label class="f">Yeni şifre<input class="in" type="password" autocomplete="new-password" data-bind="np1" value="${esc(fv('np1'))}"></label>
+    <label class="f">Yeni şifre (tekrar)<input class="in" type="password" autocomplete="new-password" data-bind="np2" value="${esc(fv('np2'))}"></label>
+    <button class="btn dark" data-a="sifre">Şifreyi kaydet</button><button class="btn ghost" data-a="logout">Çıkış yap</button></div>`;
+}
+const vMesaj = (baslik, metin, retry) => `<div class="login"><div class="mono">TEKNİK SATINALMA</div><h1>${baslik}</h1><p class="meta" style="margin:0">${metin}</p>
+  ${retry ? '<button class="btn dark" data-a="retry">Tekrar dene</button>' : ''}<button class="btn ghost" data-a="logout">Çıkış yap</button></div>`;
 function vGorev() {
   const g = tasks(), T = db.talepler, r = me().role;
   const mine = r === 'teknisyen' ? T.filter((t) => t.by === db.currentUser) : T;
@@ -440,19 +264,38 @@ function vBildirim() {
       <span><b style="font-weight:600;font-size:14px">${esc(n.text)}</b><br><span class="meta">${dtStr(n.at)}</span></span></button>`).join('') || '<div class="empty">Bildirim yok</div>'}</main>` + tabs();
 }
 function vProfil() {
-  const u = me();
+  const u = me(), yon = u.role === 'mudur' || u.role === 'gm';
   return topBack('Profil') + `<main class="nopad">
-    <div class="card user"><span class="av" style="background:${ROLES[u.role].c}">${initials(u.ad)}</span><span><b>${esc(u.ad)}</b><br><span class="meta">${ROLES[u.role].ad} · MM-2140 Bakım</span></span></div>
-    <div class="h2">Kullanıcı değiştir</div>
-    ${db.users.filter((x) => x.id !== u.id).map((x) => `<button class="card tap user" data-a="login" data-id="${x.id}"><span class="av" style="background:${ROLES[x.role].c}">${initials(x.ad)}</span>
-      <span><b>${esc(x.ad)}</b><br><span class="meta">${ROLES[x.role].ad}</span></span></button>`).join('')}
+    <div class="card user"><span class="av" style="background:${ROLES[u.role].c}">${initials(u.ad)}</span><span><b>${esc(u.ad)}</b><br><span class="meta">${ROLES[u.role].ad}</span></span></div>
+    ${yon ? '<button class="btn ghost" data-a="kullanicilar">Kullanıcı yönetimi</button>' : ''}
+    <div class="h2">Şifre değiştir</div>
+    <div class="card stack"><label class="f">Yeni şifre<input class="in" type="password" autocomplete="new-password" data-bind="np1" value="${esc(fv('np1'))}"></label>
+      <label class="f">Yeni şifre (tekrar)<input class="in" type="password" autocomplete="new-password" data-bind="np2" value="${esc(fv('np2'))}"></label>
+      <button class="btn" data-a="sifre">Şifreyi kaydet</button></div>
     <div class="h2">Onay kuralları</div>
     <div class="card"><div class="kv"><span>Talep onayı (Fabrika Müdürü)</span><span>${money(LIM_TALEP)} üzeri</span></div>
       <div class="kv"><span>Teklif değerlendirme onayı</span><span>Fabrika Müdürü</span></div>
       <div class="kv"><span>Genel Müdür onayı</span><span>${money(LIM_GM)} üzeri</span></div>
       <div class="kv"><span>KDV</span><span>%${KDV * 100}</span></div></div>
-    <div class="info amber">Bu sürümde veriler yalnızca bu cihazın tarayıcısında saklanır; başka telefonlarla paylaşılmaz.</div>
-    <button class="btn danger" data-a="reset">Örnek verileri sıfırla</button></main>`;
+    <button class="btn danger" data-a="logout">Çıkış yap</button></main>`;
+}
+function vKullanicilar() {
+  const rolSec = (k, v) => `<select class="in" data-bind="${k}">${Object.keys(ROLES).map((r) => `<option value="${r}" ${v === r ? 'selected' : ''}>${ROLES[r].ad}</option>`).join('')}</select>`;
+  return topBack('Kullanıcılar', 'Kullanıcı yönetimi') + `<main class="nopad">
+    ${db.users.map((x) => `<div class="card stack"><div class="user"><span class="av" style="background:${x.aktif ? ROLES[x.role].c : '#B9BBB3'}">${initials(x.ad)}</span>
+        <span style="flex:1"><b>${esc(x.ad)}</b><br><span class="meta">${ROLES[x.role].ad}${x.aktif ? '' : ' · pasif'}${x.gecici ? ' · geçici şifre' : ''}</span></span></div>
+      ${x.id === db.currentUser ? '' : ui.f.rs === x.id
+        ? `<label class="f">Yeni geçici şifre (en az 8 karakter)<input class="in" data-bind="rspw" autocomplete="off" value="${esc(fv('rspw'))}"></label>
+           <div class="btns"><button class="btn ghost sm" data-a="rsOff">Vazgeç</button><button class="btn sm" data-a="rsSave" data-id="${x.id}">Şifreyi ata</button></div>`
+        : `<div class="btns"><button class="btn ghost sm" data-a="rsOn" data-id="${x.id}">Şifre sıfırla</button>
+           <button class="btn ${x.aktif ? 'danger' : 'ghost'} sm" data-a="aktif" data-id="${x.id}" data-v="${x.aktif ? 0 : 1}">${x.aktif ? 'Pasifleştir' : 'Aktifleştir'}</button></div>`}</div>`).join('')}
+    <div class="h2">Yeni kullanıcı</div>
+    <div class="card stack"><label class="f">Ad soyad<input class="in" data-bind="uad" value="${esc(fv('uad'))}"></label>
+      <label class="f">E-posta (giriş adı)<input class="in" type="email" inputmode="email" autocomplete="off" data-bind="uemail" value="${esc(fv('uemail'))}"></label>
+      <label class="f">Rol${rolSec('urol', fv('urol', 'teknisyen'))}</label>
+      <label class="f">Geçici şifre (en az 8 karakter)<input class="in" autocomplete="off" data-bind="upw" value="${esc(fv('upw'))}"></label>
+      <div class="info gray">Kullanıcı ilk girişte kendi şifresini belirler. Geçici şifreyi kendisine siz iletin.</div>
+      <button class="btn" data-a="userAdd">Kullanıcıyı ekle</button></div></main>`;
 }
 
 /* --- yeni talep --- */
@@ -616,14 +459,19 @@ const actionable = (t) => tasks().some((g) => g.list.includes(t));
 /* ---------- çizim ---------- */
 function render() {
   const app = document.getElementById('app'), a = document.activeElement, key = a && a.dataset && a.dataset.bind, pos = key && a.selectionStart;
+  const u = ui.auth === 'in' ? me() : null;
   let h;
-  if (!db.currentUser) { document.body.dataset.role = ''; h = vLogin(); }
+  document.body.dataset.role = (u && u.role) || '';
+  if (ui.auth === 'loading') h = '<div class="login"><div class="empty">Yükleniyor…</div></div>';
+  else if (ui.auth === 'out') h = vLogin();
+  else if (ui.auth === 'err') h = vMesaj('Bağlantı kurulamadı', 'Veriler yüklenemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.', true);
+  else if (!u.role || u.aktif === false) h = vMesaj('Hesabınız aktif değil', 'Bu hesap için erişim tanımlı değil. Fabrika Müdürü veya Genel Müdür ile görüşün.');
+  else if (u.gecici) h = vSifre();
   else {
-    document.body.dataset.role = me().role;
     const p = ui.page;
     if (p) {
       const t = p.type === 'talep' && talep(p.id), o = p.type === 'po' && po(p.id);
-      h = p.type === 'yeni' ? vYeni() : p.type === 'profil' ? vProfil() : t ? vTalep(t) : o ? vPO(o) : null;
+      h = p.type === 'yeni' ? vYeni() : p.type === 'profil' ? vProfil() : p.type === 'kullanicilar' ? vKullanicilar() : t ? vTalep(t) : o ? vPO(o) : null;
       if (!h) { ui.page = null; }
     }
     if (!h) h = { gorev: vGorev, talepler: vTalepler, siparisler: vSiparisler, stok: vStok, bildirim: vBildirim }[ui.tab]();
@@ -632,18 +480,69 @@ function render() {
   if (key) { const el = app.querySelector(`[data-bind="${key}"]`); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) { /* select/date */ } } }
 }
 const cur = () => talep(ui.page.id);
-function commit(msg) { save(); ui.f = {}; render(); if (msg) toast(msg); }
+/* talep üzerinde sunucu işlemi: başarılıysa formu temizler, yeniden çizer, mesaj gösterir */
+async function act(a, p, msg, keep) {
+  const r = await run(a, { id: ui.page.id, ...p });
+  if (!r) return null;
+  ui.f = keep || {}; render();
+  if (msg) toast(typeof msg === 'function' ? msg(r) : msg);
+  return r;
+}
 function needNote() { const n = fv('note').trim(); if (!n) toast('Bu karar için not yazmalısınız'); return n; }
+function yeniSifre() {
+  const a = fv('np1'), b = fv('np2');
+  if (a.length < 8) { toast('Şifre en az 8 karakter olmalı'); return null; }
+  if (a !== b) { toast('Şifreler aynı değil'); return null; }
+  return a;
+}
 
 const A = {
-  login: (d) => { db.currentUser = d.id; ui.tab = 'gorev'; ui.filt = 'Tümü'; ui.f = {}; save(); if (ui.page) back(); else render(); window.scrollTo(0, 0); },
-  tab: (d) => { ui.tab = d.k; ui.filt = 'Tümü'; ui.f = {}; render(); window.scrollTo(0, 0); },
+  login: async () => {
+    const email = fv('email').trim(), password = fv('pw');
+    if (!email || !password) return toast('E-posta ve şifrenizi yazın');
+    if (busy) return; busy = true;
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    busy = false;
+    if (error) toast(/invalid/i.test(error.message) ? 'E-posta veya şifre hatalı' : 'Giriş yapılamadı; bağlantınızı kontrol edin');
+    else { ui.f = {}; ui.tab = 'gorev'; }
+  },
+  logout: async () => { await sb.auth.signOut(); },
+  retry: async () => { const { data } = await sb.auth.getSession(); ui.auth = 'loading'; render(); db.currentUser = null; onSession(data.session); },
+  sifre: async () => {
+    const sifre = yeniSifre(); if (!sifre) return;
+    const { data } = await sb.auth.getSession(), email = data.session.user.email;
+    if (!(await run('sifreDegistir', { sifre }))) return;
+    await sb.auth.signInWithPassword({ email, password: sifre });
+    try { await loadData(); } catch (e) { /* sonraki tazelemede */ }
+    ui.f = {}; render(); toast('Şifreniz değiştirildi');
+  },
+  kullanicilar: () => open({ type: 'kullanicilar' }),
+  rsOn: (d) => { ui.f.rs = d.id; ui.f.rspw = ''; render(); }, rsOff: () => { delete ui.f.rs; render(); },
+  rsSave: async (d) => {
+    if (fv('rspw').length < 8) return toast('Şifre en az 8 karakter olmalı');
+    if (await run('sifreSifirla', { id: d.id, sifre: fv('rspw') })) { ui.f = {}; render(); toast('Geçici şifre atandı'); }
+  },
+  aktif: async (d) => {
+    if (d.v === '0' && !confirm('Kullanıcı pasifleştirilsin mi? Giriş yapamaz ve kayıtları göremez.')) return;
+    if (await run('kullaniciGuncelle', { id: d.id, aktif: d.v === '1' })) { render(); toast(d.v === '1' ? 'Kullanıcı aktifleştirildi' : 'Kullanıcı pasifleştirildi'); }
+  },
+  userAdd: async () => {
+    const p = { ad: fv('uad').trim(), email: fv('uemail').trim(), rol: fv('urol', 'teknisyen'), sifre: fv('upw') };
+    if (p.ad.length < 3) return toast('Ad soyad yazın');
+    if (!/^\S+@\S+\.\S+$/.test(p.email)) return toast('Geçerli bir e-posta yazın');
+    if (p.sifre.length < 8) return toast('Geçici şifre en az 8 karakter olmalı');
+    if (await run('kullaniciEkle', p)) { ui.f = {}; render(); toast(p.ad + ' eklendi'); }
+  },
+  tab: (d) => { ui.tab = d.k; ui.filt = 'Tümü'; ui.f = {}; render(); window.scrollTo(0, 0); refresh(); },
   filt: (d) => { ui.filt = d.k; render(); },
   back, profil: () => open({ type: 'profil' }),
   openTalep: (d) => open({ type: 'talep', id: d.id }), openPO: (d) => open({ type: 'po', id: d.id }),
-  openNotif: (d) => { const n = db.bildirimler.find((x) => x.id === d.id); if (!n.read.includes(db.currentUser)) n.read.push(db.currentUser); save(); open({ type: 'talep', id: n.talepId }); },
-  readAll: () => { myNotifs().forEach((n) => { if (!n.read.includes(db.currentUser)) n.read.push(db.currentUser); }); save(); render(); },
-  reset: () => { if (!confirm('Tüm kayıtlar silinip örnek veriler yeniden yüklenecek. Emin misiniz?')) return; seed(); save(); ui.page = null; render(); },
+  openNotif: (d) => {
+    const n = db.bildirimler.find((x) => x.id === d.id);
+    if (!n.read.includes(db.currentUser)) { n.read.push(db.currentUser); sb.functions.invoke('islem', { body: { a: 'okundu', p: { id: n.id } } }); }
+    if (talep(n.talepId)) open({ type: 'talep', id: n.talepId }); else render();
+  },
+  readAll: async () => { if (await run('okundu', {})) render(); },
   yeni: (d) => { open({ type: 'yeni' }); ui.f.lines = []; if (d.sku) { ui.f.pick = d.sku; ui.f.lqty = d.qty; } render(); },
   pickItem: (d) => { ui.f.pick = d.sku; ['lname', 'lqty', 'lunit', 'lest'].forEach((k) => delete ui.f[k]); render(); },
   cancelItem: () => { delete ui.f.pick; render(); },
@@ -656,52 +555,53 @@ const A = {
     ['pick', 'lname', 'lqty', 'lunit', 'lest', 'mq'].forEach((k) => delete ui.f[k]); render();
   },
   delLine: (d) => { ui.f.lines.splice(+d.i, 1); render(); },
-  sendTalep: () => {
+  sendTalep: async () => {
     if (!(ui.f.lines || []).length) return toast(ui.f.pick ? 'Önce "Kalemi ekle"ye basın' : 'En az bir kalem ekleyin');
-    const t = createTalep({ lines: ui.f.lines, machine: fv('machine', MAKINELER[0]), urgency: fv('urgency', 'Normal'), need: fv('need', addDays(7)), note: fv('note').trim() });
-    save(); ui.f = {}; ui.page = { type: 'talep', id: t.id }; render(); window.scrollTo(0, 0);
-    toast(t.no + (t.direct ? ' satınalmaya gönderildi' : ' müdür onayına gönderildi'));
+    const r = await run('createTalep', { lines: ui.f.lines, machine: fv('machine', MAKINELER[0]), urgency: fv('urgency', 'Normal'), need: fv('need', addDays(7)), note: fv('note').trim() });
+    if (!r) return;
+    ui.f = {}; ui.page = { type: 'talep', id: r.id }; render(); window.scrollTo(0, 0);
+    toast(r.no + (r.status === 'teklif' ? ' satınalmaya gönderildi' : ' müdür onayına gönderildi'));
   },
-  talepOk: () => { decideTalep(cur(), true, fv('note').trim()); commit('Talep onaylandı'); },
-  talepRed: () => { const n = needNote(); if (n) { decideTalep(cur(), false, n); commit('Talep reddedildi'); } },
-  talepIptal: () => { if (confirm('Talep iptal edilsin mi?')) { stop(cur(), 1, 'iptal', 'Talep iptal edildi'); commit('Talep iptal edildi'); } },
+  talepOk: () => act('decideTalep', { ok: true, note: fv('note').trim() }, 'Talep onaylandı'),
+  talepRed: () => { const n = needNote(); if (n) act('decideTalep', { ok: false, note: n }, 'Talep reddedildi'); },
+  talepIptal: () => { if (confirm('Talep iptal edilsin mi?')) act('cancelTalep', {}, 'Talep iptal edildi'); },
   qformOn: () => { ui.f.qform = true; render(); }, qformOff: () => { ui.f.qform = false; render(); },
   addQuote: () => {
     const t = cur(), supplier = fv('qs').trim(), prices = t.lines.map((l, i) => num(fv('qp' + i)));
     if (!supplier) return toast('Tedarikçi adını yazın');
     if (prices.some((p) => p <= 0)) return toast('Her kalem için birim fiyat girin');
-    const note = fv('note');
-    addQuote(t, { supplier, prices, lead: num(fv('ql')) || '', term: fv('qt').trim(), note: fv('qn').trim() });
-    save(); ui.f = { note }; render(); toast('Teklif kaydedildi');
+    act('addQuote', { supplier, prices, lead: num(fv('ql')), term: fv('qt').trim(), qnote: fv('qn').trim() }, 'Teklif kaydedildi', { note: fv('note') });
   },
-  delQuote: (d) => { if (confirm('Teklif silinsin mi?')) { delQuote(cur(), d.id); save(); render(); } },
-  pickQuote: (d) => { cur().pick = d.id; save(); render(); },
-  sendQuotes: () => { sendQuotes(cur(), fv('note', cur().pickNote).trim()); commit('Değerlendirme onayına gönderildi'); },
-  quoteOk: () => { const t = cur(); decideQuote(t, 'ok', fv('note').trim()); commit(t.status === 'gm_onayi' ? 'Genel Müdür onayına yükseltildi' : 'Onaylandı — satınalma sipariş açabilir'); },
-  quoteRev: () => { const n = needNote(); if (n) { decideQuote(cur(), 'rev', n); commit('Revizyon istendi'); } },
-  quoteRed: () => { const n = needNote(); if (n) { decideQuote(cur(), 'red', n); commit('Alım reddedildi'); } },
+  delQuote: (d) => { if (confirm('Teklif silinsin mi?')) act('delQuote', { qid: d.id }, null, ui.f); },
+  pickQuote: (d) => { if (cur().pick !== d.id) act('pickQuote', { qid: d.id }, null, ui.f); },
+  sendQuotes: () => act('sendQuotes', { note: fv('note', cur().pickNote).trim() }, 'Değerlendirme onayına gönderildi'),
+  quoteOk: () => act('decideQuote', { dec: 'ok', note: fv('note').trim() }, (r) => r.status === 'gm_onayi' ? 'Genel Müdür onayına yükseltildi' : 'Onaylandı — satınalma sipariş açabilir'),
+  quoteRev: () => { const n = needNote(); if (n) act('decideQuote', { dec: 'rev', note: n }, 'Revizyon istendi'); },
+  quoteRed: () => { const n = needNote(); if (n) act('decideQuote', { dec: 'red', note: n }, 'Alım reddedildi'); },
   createPO: () => {
-    const eta = fv('eta', addDays(Number(picked(cur()).lead) || 3));
+    const q = picked(cur()), eta = fv('eta', addDays(Number(q.lead) || 3));
     if (!eta) return toast('Tahmini teslim tarihini seçin');
-    const p = createPO(cur(), { eta, term: fv('term', picked(cur()).term || '').trim(), place: fv('place', 'Bakım deposu').trim(), note: fv('note').trim() });
-    commit(p.no + ' oluşturuldu, onaya gönderildi');
+    act('createPO', { eta, term: fv('term', q.term || '').trim(), place: fv('place', 'Bakım deposu').trim(), note: fv('note').trim() }, (r) => r.poNo + ' oluşturuldu, onaya gönderildi');
   },
-  poOk: () => { decidePO(cur(), true, fv('note').trim()); commit('Sipariş onaylandı'); },
-  poRed: () => { const n = needNote(); if (n) { decidePO(cur(), false, n); commit('Sipariş reddedildi'); } },
+  poOk: () => act('decidePO', { ok: true, note: fv('note').trim() }, 'Sipariş onaylandı'),
+  poRed: () => { const n = needNote(); if (n) act('decidePO', { ok: false, note: n }, 'Sipariş reddedildi'); },
   receive: () => {
-    const t = cur(), p = po(t.poId), qtys = p.lines.map((l, i) => num(fv('rq' + i, String(l.qty - l.received))));
+    const p = po(cur().poId), qtys = p.lines.map((l, i) => num(fv('rq' + i, String(l.qty - l.received))));
     if (p.lines.some((l, i) => qtys[i] > l.qty - l.received)) return toast('Kalan miktardan fazla kabul edilemez');
     if (!qtys.some((q) => q > 0)) return toast('Teslim alınan miktarı girin');
-    receive(t, qtys, fv('irs').trim()); commit(t.status === 'depoda' ? 'Mal kabul tamamlandı' : 'Kısmi mal kabul kaydedildi');
+    act('receive', { qtys, irsaliye: fv('irs').trim() }, (r) => r.status === 'depoda' ? 'Mal kabul tamamlandı' : 'Kısmi mal kabul kaydedildi');
   },
-  handover: () => { handover(cur()); commit('Teslim alındı, talep kapandı'); },
+  handover: () => act('handover', {}, 'Teslim alındı, talep kapandı'),
 };
 
 document.addEventListener('click', (e) => { const el = e.target.closest('[data-a]'); if (el && A[el.dataset.a]) A[el.dataset.a](el.dataset); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('.login input')) { const b = document.querySelector('.login .btn'); if (b) b.click(); } });
 const onInput = (e) => { const el = e.target; if (!el.dataset || !el.dataset.bind) return; set(el.dataset.bind, el.value); if ('live' in el.dataset) render(); };
 document.addEventListener('input', onInput);
 document.addEventListener('change', onInput);
+document.addEventListener('visibilitychange', refresh);
+setInterval(refresh, 20000);
 
-load();
 render();
+sb.auth.onAuthStateChange((ev, session) => { setTimeout(() => onSession(session), 0); });
 })();
