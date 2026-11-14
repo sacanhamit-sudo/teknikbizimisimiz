@@ -244,15 +244,19 @@ const topBack = (title, sub) => `<header class="top"><button class="back" data-a
 
 /* ---------- ekranlar ---------- */
 function vLogin() {
+  if (ui.f.unut) return `<div class="login"><div class="mono">TEKNİK SATINALMA</div><h1>Şifremi unuttum</h1>
+    <p class="meta" style="margin:0">Giriş e-postanızı yazın; şifrenizi yeniden belirlemeniz için bir bağlantı gönderelim.</p>
+    <label class="f">E-posta<input class="in" type="email" autocomplete="username" inputmode="email" data-bind="email" value="${esc(fv('email'))}"></label>
+    <button class="btn dark" data-a="unutGonder">Sıfırlama bağlantısı gönder</button><button class="btn ghost" data-a="unutOff">Girişe dön</button></div>`;
   return `<div class="login"><div class="mono">TEKNİK SATINALMA</div><h1>Giriş yapın</h1>
     <label class="f">E-posta<input class="in" type="email" autocomplete="username" inputmode="email" data-bind="email" value="${esc(fv('email'))}"></label>
     <label class="f">Şifre<input class="in" type="password" autocomplete="current-password" data-bind="pw" value="${esc(fv('pw'))}"></label>
-    <button class="btn dark" data-a="login">Giriş yap</button>
-    <p class="meta">Hesabınız yoksa veya şifrenizi unuttuysanız Fabrika Müdürü ya da Genel Müdür hesabından yeni şifre atanabilir.</p></div>`;
+    <button class="btn dark" data-a="login">Giriş yap</button><button class="btn ghost" data-a="unutOn">Şifremi unuttum</button>
+    <p class="meta">E-postanıza ulaşamıyorsanız Fabrika Müdürü ya da Genel Müdür hesabından yeni şifre atanabilir.</p></div>`;
 }
 function vSifre() {
   return `<div class="login"><div class="mono">TEKNİK SATINALMA</div><h1>Yeni şifrenizi belirleyin</h1>
-    <p class="meta" style="margin:0">Size verilen geçici şifreyle giriş yaptınız. Devam etmek için kendi şifrenizi belirleyin (en az 8 karakter).</p>
+    <p class="meta" style="margin:0">${ui.recovery ? 'Şifre sıfırlama bağlantısıyla geldiniz. Yeni şifrenizi belirleyin (en az 8 karakter).' : 'Size verilen geçici şifreyle giriş yaptınız. Devam etmek için kendi şifrenizi belirleyin (en az 8 karakter).'}</p>
     <label class="f">Yeni şifre<input class="in" type="password" autocomplete="new-password" data-bind="np1" value="${esc(fv('np1'))}"></label>
     <label class="f">Yeni şifre (tekrar)<input class="in" type="password" autocomplete="new-password" data-bind="np2" value="${esc(fv('np2'))}"></label>
     <button class="btn dark" data-a="sifre">Şifreyi kaydet</button><button class="btn ghost" data-a="logout">Çıkış yap</button></div>`;
@@ -526,7 +530,7 @@ function render() {
   else if (ui.auth === 'out') h = vLogin();
   else if (ui.auth === 'err') h = vMesaj('Bağlantı kurulamadı', 'Veriler yüklenemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.', true);
   else if (!u.role || u.aktif === false) h = vMesaj('Hesabınız aktif değil', 'Bu hesap için erişim tanımlı değil. Fabrika Müdürü veya Genel Müdür ile görüşün.');
-  else if (u.gecici) h = vSifre();
+  else if (u.gecici || ui.recovery) h = vSifre();
   else {
     const p = ui.page;
     if (p) {
@@ -566,7 +570,18 @@ const A = {
     if (error) toast(/invalid/i.test(error.message) ? 'E-posta veya şifre hatalı' : 'Giriş yapılamadı; bağlantınızı kontrol edin');
     else { ui.f = {}; ui.tab = 'gorev'; }
   },
-  logout: async () => { await sb.auth.signOut(); },
+  logout: async () => { ui.recovery = false; await sb.auth.signOut(); },
+  unutOn: () => { ui.f = { unut: true, email: fv('email') }; render(); }, unutOff: () => { ui.f = { email: fv('email') }; render(); },
+  unutGonder: async () => {
+    const email = fv('email').trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) return toast('Geçerli bir e-posta yazın');
+    if (busy) return; busy = true;
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/' });
+    busy = false;
+    if (error && error.status === 429) return toast('Çok sık denendi; birkaç dakika sonra tekrar deneyin');
+    if (error && !error.status) return toast('Gönderilemedi; bağlantınızı kontrol edin');
+    ui.f = { email }; render(); toast('Bu adres kayıtlıysa sıfırlama bağlantısı gönderildi; e-postanızı kontrol edin');
+  },
   retry: async () => { const { data } = await sb.auth.getSession(); ui.auth = 'loading'; render(); db.currentUser = null; onSession(data.session); },
   sifre: async () => {
     const sifre = yeniSifre(); if (!sifre) return;
@@ -574,7 +589,7 @@ const A = {
     if (!(await run('sifreDegistir', { sifre }))) return;
     await sb.auth.signInWithPassword({ email, password: sifre });
     try { await loadData(); } catch (e) { /* sonraki tazelemede */ }
-    ui.f = {}; render(); toast('Şifreniz değiştirildi');
+    ui.f = {}; ui.recovery = false; render(); toast('Şifreniz değiştirildi');
   },
   kullanicilar: () => { open({ type: 'kullanicilar' }); epostaYukle(); },
   rsOn: (d) => { ui.f.rs = d.id; ui.f.rspw = ''; render(); }, rsOff: () => { delete ui.f.rs; render(); },
@@ -681,5 +696,12 @@ document.addEventListener('visibilitychange', refresh);
 setInterval(refresh, 20000);
 
 render();
-sb.auth.onAuthStateChange((ev, session) => { setTimeout(() => onSession(session), 0); });
+if (/error_code=otp_expired|error=access_denied/.test(location.hash)) {
+  history.replaceState(null, '', location.pathname);
+  setTimeout(() => toast('Bağlantının süresi dolmuş ya da daha önce kullanılmış; yeniden isteyin'), 400);
+}
+sb.auth.onAuthStateChange((ev, session) => {
+  if (ev === 'PASSWORD_RECOVERY') { ui.recovery = true; if (ui.auth === 'in') render(); }
+  setTimeout(() => onSession(session), 0);
+});
 })();
