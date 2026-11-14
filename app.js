@@ -131,7 +131,7 @@ async function refresh() {
 const ui = { auth: 'loading', tab: 'gorev', page: null, f: {}, filt: 'Tümü', epostalar: {} };
 const set = (k, v) => { ui.f[k] = v; };
 const fv = (k, d = '') => (ui.f[k] ?? d);
-function open(page, fresh = true) { if (fresh) ui.f = {}; ui.page = page; history.pushState({ p: 1 }, ''); render(); window.scrollTo(0, 0); }
+function open(page, fresh = true) { if (fresh) ui.f = {}; ui.page = page; history.pushState({ p: 1 }, ''); render(); window.scrollTo(0, 0); refresh(); }
 function closePage() { ui.page = null; ui.f = {}; render(); }
 window.addEventListener('popstate', () => { if (skipPop) { skipPop = false; return; } if (scanHist) { scanHist = false; stopScan(); return; } if (ui.page) closePage(); });
 const back = () => history.back();
